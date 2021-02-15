@@ -2,11 +2,13 @@
   "name": "ConstexprJS",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "main": "constexpr.js",
+  "bin": {
+    "constexpr.js": "./constexpr.js"
   },
-  "keywords": [],
+  "keywords": [
+    "static site generator"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {

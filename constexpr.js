@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const {htmlFiles, isPortFree} = require("./utils");
 const {spawnChrome} = require("chrome-debugging-client");
 
