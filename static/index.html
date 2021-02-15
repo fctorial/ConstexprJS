@@ -1,6 +1,7 @@
 <html>
 <head>
-    <script constexpr src="http://localhost:8012/constexpr-client.js"></script>
+    <script constexpr src="/constexpr-client.js"></script>
+    <script src="/runtime_data.js"></script>
 </head>
 <body>
 
@@ -27,7 +28,7 @@
   function effect() {
     let el = document.querySelector('h1')
     let d = +new Date()
-    el.style.left = 20 * Math.sin(+new Date() / 200)
+    el.style.left = X * Math.sin(+new Date() / 200)
   }
 
   setInterval(effect, 10)

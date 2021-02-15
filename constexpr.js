@@ -90,15 +90,17 @@ async function main() {
   let port = 9045
   let server = null
   while (server === null) {
+    port++
     try {
       server = app.listen(port)
     } catch (e) {}
-    port++
   }
 
   try {
     const paths = await htmlFiles(input, input)
-    const chrome = spawnChrome({headless: true});
+    const chrome = spawnChrome({
+      // headless: true
+    });
     try {
       const browser = chrome.connection;
 
