@@ -42,6 +42,8 @@ async function main() {
   let exclusions
   if (argv.exclusions) {
     exclusions = argv.exclusions.split(':')
+  } else {
+    exclusions = []
   }
 
   const input = path.resolve(argv.input)
