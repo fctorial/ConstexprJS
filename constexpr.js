@@ -78,7 +78,7 @@ async function main() {
   try {
     const paths = await htmlFiles(input, input)
     const chrome = spawnChrome({
-      headless: !argv.verbose
+      headless: true
     });
     try {
       const browser = chrome.connection;
