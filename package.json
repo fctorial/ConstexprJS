@@ -1,6 +1,6 @@
 {
-  "name": "ConstexprJS",
-  "version": "1.0.0",
+  "name": "constexpr.js",
+  "version": "0.1.0",
   "description": "",
   "main": "constexpr.js",
   "bin": {
@@ -9,7 +9,7 @@
   "keywords": [
     "static site generator"
   ],
-  "author": "",
+  "author": "fctorial <fctorial@gmail.com> (https://fctorial.github.io)",
   "license": "ISC",
   "dependencies": {
     "chrome-debugging-client": "^2.0.0",
