@@ -12,7 +12,7 @@ window.addEventListener('load', () => {
 
 window._ConstexprJS_.compile = () => {
   window._ConstexprJS_.signalled = true
-  window._ConstexprJS_.finishedLoading = document.readyState === 'complete'
+  window._ConstexprJS_.finishedLoading = document.readyState !== 'loading'
   window._ConstexprJS_.tryCompilation()
 }
 
@@ -26,7 +26,7 @@ window._ConstexprJS_.tryCompilation = () => {
   document.querySelectorAll('[constexpr]').forEach(
     el => el.remove()
   )
-  window._ConstexprJS_.triggerCompilation(compilerInputs)
+  setTimeout(() => window._ConstexprJS_.triggerCompilation(compilerInputs), 1000)
 }
 
 window._ConstexprJS_.triggerCompilation = (compilerInputs) => {

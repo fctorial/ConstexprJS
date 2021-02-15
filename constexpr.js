@@ -1,14 +1,12 @@
 const {htmlFiles, isPortFree} = require("./utils");
-
-const { writeFileSync } = require("fs");
-const { spawnChrome } = require("chrome-debugging-client");
+const {spawnChrome} = require("chrome-debugging-client");
 
 async function printToPDF(argv) {
-  const chrome = spawnChrome({ headless: true });
+  const chrome = spawnChrome({headless: true});
   try {
     const browser = chrome.connection;
 
-    const { targetId } = await browser.send("Target.createTarget", {
+    const {targetId} = await browser.send("Target.createTarget", {
       url: "about:blank",
     });
 
@@ -22,7 +20,7 @@ async function printToPDF(argv) {
       page.until("Page.loadEventFired"),
     ]);
 
-    const { result: { value: args } } = await page.send('Runtime.evaluate', {
+    const {result: {value: args}} = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve, reject) => {
         window._ConstexprJS_.triggerCompilationHook = (args) => resolve(args)
       })`,
@@ -49,7 +47,8 @@ async function printToPDF(argv) {
 const fs = require('fs')
 const path = require('path')
 const yargs = require('yargs/yargs')
-const { hideBin } = require('yargs/helpers')
+const {doTheThing} = require("./compiler");
+const {hideBin} = require('yargs/helpers')
 const argv = yargs(hideBin(process.argv)).argv
 
 async function main() {
@@ -88,14 +87,31 @@ async function main() {
   const express = require('express')
   const app = express()
   app.use(express.static(input))
-
   let port = 9045
-  // while (!isPortFree(port)) {
-  //   port++
-  // }
-  const server = app.listen(port)
-  const files = await htmlFiles(input)
-  console.log(JSON.stringify(files, null, 4))
+  let server = null
+  while (server === null) {
+    try {
+      server = app.listen(port)
+    } catch (e) {}
+    port++
+  }
+
+  try {
+    const paths = await htmlFiles(input, input)
+    const chrome = spawnChrome({headless: true});
+    try {
+      const browser = chrome.connection;
+
+      await doTheThing(input, `http://localhost:${port}`, paths, browser)
+
+      await chrome.close()
+    } catch (e) {
+      console.log(e)
+      await chrome.dispose()
+    }
+  } catch (e) {
+    console.log(e)
+  }
   await server.close()
 }
 
