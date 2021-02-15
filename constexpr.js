@@ -6,6 +6,7 @@ const {spawnChrome} = require("chrome-debugging-client");
 const fs = require('fs')
 const path = require('path')
 const yargs = require('yargs/yargs')
+const {isChildOf} = require("./utils");
 const {setJobCount} = require("./compiler");
 const {log} = require("./utils");
 const {enableVerbose} = require("./utils");
@@ -14,7 +15,7 @@ const {hideBin} = require('yargs/helpers')
 
 function usage() {
   console.log(
-    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n]`
+    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--force]`
   )
   process.exit(1)
 }
@@ -57,11 +58,11 @@ async function main() {
     fs.mkdirSync(output)
   }
 
-  if (fs.readdirSync(output).length !== 0) {
+  if (fs.readdirSync(output).length !== 0 && !argv.force) {
     console.error('output directory is not empty')
     process.exit(1)
   } else if (
-    input.startsWith(output) || output.startsWith(input)
+    isChildOf(input, output) || isChildOf(output, input)
   ) {
     console.error('input and output directories must not be inside each other')
     process.exit(1)
@@ -90,7 +91,7 @@ async function main() {
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, paths, exclusions, browser)
+      await compile(input, output, `http://localhost:${port}`, paths, exclusions, browser, !!argv.force)
 
       await chrome.close()
     } catch (e) {

@@ -36,6 +36,12 @@ function fileExists(f) {
   })
 }
 
+const isChildOf = (child, parent) => {
+  if (child === parent) return false
+  const parentTokens = parent.split('/').filter(i => i.length)
+  return parentTokens.every((t, i) => child.split('/')[i] === t)
+}
+
 let verbose = false
 function enableVerbose() {
   verbose = true
@@ -52,5 +58,6 @@ module.exports = {
   sleep,
   fileExists,
   log,
-  enableVerbose
+  enableVerbose,
+  isChildOf
 }
