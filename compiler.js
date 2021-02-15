@@ -1,3 +1,5 @@
+const lint = require('html-prettify')
+
 const tc = 1
 
 async function addDeps(page, deps, logFlag) {
@@ -47,7 +49,7 @@ async function processHtml(httpBase, path, browser) {
   logFlag.value = false
 
   return {
-    html,
+    html: lint(html),
     deps: deps
       .filter(e => constexprResources.indexOf(e) === -1)
       .filter(e => e.startsWith(httpBase))
