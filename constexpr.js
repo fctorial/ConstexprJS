@@ -49,9 +49,9 @@ const path = require('path')
 const yargs = require('yargs/yargs')
 const {doTheThing} = require("./compiler");
 const {hideBin} = require('yargs/helpers')
-const argv = yargs(hideBin(process.argv)).argv
 
 async function main() {
+  const argv = yargs(hideBin(process.argv)).argv
   if (
     !argv.input || !argv.output
   ) {
