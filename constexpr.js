@@ -12,7 +12,7 @@ const {hideBin} = require('yargs/helpers')
 
 function usage() {
   console.log(
-    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--verbose] [--jobs=n]`
+    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n]`
   )
   process.exit(1)
 }
@@ -34,6 +34,11 @@ async function main() {
     !argv.input || !argv.output
   ) {
     usage()
+  }
+
+  let exclusions
+  if (argv.exclusions) {
+    exclusions = argv.exclusions.split(':')
   }
 
   const input = path.resolve(argv.input)
@@ -76,14 +81,14 @@ async function main() {
   }
 
   try {
-    const paths = await htmlFiles(input, input)
+    const paths = (await htmlFiles(input, input)).filter(p => !exclusions.some(exc => p.startsWith(exc)))
     const chrome = spawnChrome({
       headless: true
     });
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, paths, browser)
+      await compile(input, output, `http://localhost:${port}`, paths, exclusions, browser)
 
       await chrome.close()
     } catch (e) {

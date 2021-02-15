@@ -19,7 +19,7 @@ async function addDeps(page, deps, logFlag) {
   }
 }
 
-async function processHtml(httpBase, path, browser, idx) {
+async function processHtml(httpBase, path, exclusions, browser, idx) {
   const {targetId} = await browser.send('Target.createTarget', {
     url: 'about:blank',
   })
@@ -121,11 +121,12 @@ async function processHtml(httpBase, path, browser, idx) {
       .filter(e => constexprResources.indexOf(e) === -1)
       .filter(e => e.startsWith(httpBase))
       .map(e => e.replace(httpBase, ''))
+      .filter(e => !exclusions.some(exc => e.startsWith(exc)))
       .filter(e => !e.endsWith('.html'))
   }
 }
 
-async function compile(fsBase, outFsBase, httpBase, paths, browser) {
+async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) {
   const htmls = {}
   const taskQueue = {}
   const results = []
@@ -136,7 +137,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, browser) {
       break
     }
     if (tasks.length < jobsCount && next < paths.length) {
-      taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
+      taskQueue[next] = processHtml(httpBase, paths[next], exclusions, browser, next)
       next++
       log(`Queued file #${next}`)
     } else {
@@ -163,7 +164,6 @@ async function compile(fsBase, outFsBase, httpBase, paths, browser) {
       }
     }
   }
-  const htmlPaths = paths.map(p => path.join(fsBase, p))
   for (let i = 0; i < paths.length; i++) {
     htmls[path.join(fsBase, results[i].path)] = results[i].html
   }
