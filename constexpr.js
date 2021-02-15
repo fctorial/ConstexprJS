@@ -10,6 +10,13 @@ const {enableVerbose} = require("./utils");
 const {compile} = require("./compiler");
 const {hideBin} = require('yargs/helpers')
 
+function usage() {
+  console.log(
+    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--verbose] [--jobs=n]`
+  )
+  process.exit(1)
+}
+
 async function main() {
   const argv = yargs(hideBin(process.argv)).argv
   if (argv.verbose) {
@@ -26,10 +33,7 @@ async function main() {
   if (
     !argv.input || !argv.output
   ) {
-    console.log(
-      `Usage: constexpr --input=<input_directory> --output=<output_directory> [--verbose] [--jobs=n]`
-    )
-    process.exit(1)
+    usage()
   }
 
   const input = path.resolve(argv.input)
@@ -37,12 +41,13 @@ async function main() {
 
   if (
     !fs.existsSync(input) || !fs.lstatSync(input).isDirectory() ||
-    !fs.existsSync(output) || !fs.lstatSync(output).isDirectory()
+    fs.existsSync(output) && !fs.lstatSync(output).isDirectory()
   ) {
-    console.log(
-      `Usage: constexpr --input=<input_directory> --output=<output_directory> [--verbose] [--jobs=n]`
-    )
-    process.exit(1)
+    usage()
+  }
+
+  if (! fs.existsSync(output)) {
+    fs.mkdirSync(output)
   }
 
   if (fs.readdirSync(output).length !== 0) {
@@ -78,7 +83,7 @@ async function main() {
     try {
       const browser = chrome.connection;
 
-      await compile(input, `http://localhost:${port}`, paths, browser)
+      await compile(input, output, `http://localhost:${port}`, paths, browser)
 
       await chrome.close()
     } catch (e) {

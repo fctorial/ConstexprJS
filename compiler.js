@@ -67,7 +67,7 @@ async function processHtml(httpBase, path, browser, idx) {
   }
 }
 
-async function compile(fsBase, httpBase, paths, browser) {
+async function compile(fsBase, outFsBase, httpBase, paths, browser) {
   const htmls = {}
   const taskQueue = {}
   const results = []
@@ -107,10 +107,18 @@ async function compile(fsBase, httpBase, paths, browser) {
   }
   const htmlPaths = paths.map(p => path.join(fsBase, p))
   for (let i = 0; i < paths.length; i++) {
-    htmls[htmlPaths[i]] = results[i]
+    htmls[htmlPaths[i]] = results[i].html
   }
-  // console.log(htmls)
-  // console.log(allDepsPresent)
+
+  for (let inp of allDepsPresent) {
+    const out = inp.replace(fsBase, outFsBase)
+    const dir = path.dirname(out)
+    await fs.mkdir(dir, {recursive: true})
+    await fs.copyFile(inp, out)
+  }
+  for (let p of Object.keys(htmls)) {
+    await fs.writeFile(p.replace(fsBase, outFsBase), htmls[p])
+  }
 }
 
 module.exports = {
