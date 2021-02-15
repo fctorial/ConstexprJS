@@ -1,4 +1,4 @@
-const lint = require('xml-formatter')
+const formatHtml = s => s
 const {sleep} = require("./utils");
 const any = require('promise.any')
 const fs = require("fs").promises;
@@ -103,7 +103,7 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
     returnByValue: true
   })
 
-  const html = lint(
+  const html = formatHtml(
     (await page.send('DOM.getOuterHTML', {
       nodeId: (await page.send('DOM.getDocument')).root.nodeId
     })).outerHTML,
