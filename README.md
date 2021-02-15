@@ -48,3 +48,6 @@ if (!window._ConstexprJS_) {
 
 3. The generated pages don't have to be static. You can skip marking javascript that isn't used for rendering.
    That will be included in the output html as is. For example, [this](https://fctorial.github.io/demos/constexpr.js/input.html) input page is converted to [this](https://fctorial.github.io/demos/constexpr.js/output.html) output page. The header is being animated with javascript.
+
+4. You can mark tags other than script as constexpr as well. They won't be included in output.
+   (Might be used for distinguishing source files from generated files.)
