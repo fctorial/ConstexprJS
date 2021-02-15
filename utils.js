@@ -15,6 +15,13 @@ async function htmlFiles(fsBase, dir) {
   return htmls
 }
 
+async function sleep(n) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(), n)
+  })
+}
+
 module.exports = {
-  htmlFiles
+  htmlFiles,
+  sleep
 }

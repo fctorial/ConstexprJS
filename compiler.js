@@ -1,11 +1,12 @@
-const lint = require('html-prettify')
+const lint = require('xml-formatter')
+const {sleep} = require("./utils");
 
 const tc = 1
 
 async function addDeps(page, deps, logFlag) {
   while (logFlag.value) {
     try {
-      const { request: {url} } = await page.until('Network.requestWillBeSent')
+      const {request: {url}} = await page.until('Network.requestWillBeSent')
       deps.push(url)
     } catch (e) {
       return
@@ -29,7 +30,7 @@ async function processHtml(httpBase, path, browser) {
     url: `${httpBase}${path}`
   })
 
-  const {result : {value: {constexprResources}}} = await page.send('Runtime.evaluate', {
+  const {result: {value: {constexprResources}}} = await page.send('Runtime.evaluate', {
     expression: `new Promise((resolve, reject) => {
         if (! window._ConstexprJS_) {
           window._ConstexprJS_ = {}
@@ -43,26 +44,39 @@ async function processHtml(httpBase, path, browser) {
 
   console.log(constexprResources)
 
-  const html = await page.send('DOM.getOuterHTML', {
-    nodeId: (await page.send('DOM.getDocument')).root.nodeId
-  })
+  const html = lint(
+    (await page.send('DOM.getOuterHTML', {
+      nodeId: (await page.send('DOM.getDocument')).root.nodeId
+    })).outerHTML,
+    {
+      lineSeparator: '\n'
+    }
+  )
   logFlag.value = false
-
+  console.log(html)
+  await browser.send('Target.closeTarget', { targetId })
   return {
-    html: lint(html),
+    html,
     deps: deps
       .filter(e => constexprResources.indexOf(e) === -1)
       .filter(e => e.startsWith(httpBase))
+      .map(e => e.replace(httpBase, ''))
       .filter(e => !e.endsWith('.html'))
   }
 }
 
 async function doTheThing(fsBase, httpBase, paths, browser) {
   const htmls = {}
-  for (let i=0; i<paths.length; i++) {
-    htmls[paths[i]] = await processHtml(httpBase, paths[i], browser)
+  const results = await Promise.all(paths.map(path => processHtml(httpBase, path, browser)))
+  const allDeps = new Set()
+  results.forEach(res => {
+    res.deps.forEach(d => allDeps.add(d))
+    delete res.deps
+  })
+  for (let i = 0; i < paths.length; i++) {
+    htmls[paths[i]] = results[i]
   }
-  console.log(htmls)
+  await sleep(1000)
 }
 
 module.exports = {
