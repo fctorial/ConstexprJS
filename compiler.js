@@ -4,7 +4,7 @@ async function addDeps(page, deps, logFlag) {
   while (logFlag.value) {
     try {
       const { request: {url} } = await page.until('Network.requestWillBeSent')
-      deps[url] = true
+      deps.push(url)
     } catch (e) {
       return
     }
@@ -19,7 +19,7 @@ async function processHtml(httpBase, path, browser) {
   await page.send('Page.enable')
   await page.send('Network.enable')
 
-  const deps = {}
+  const deps = []
   const logFlag = {value: true}
   addDeps(page, deps, logFlag)
 
@@ -44,20 +44,23 @@ async function processHtml(httpBase, path, browser) {
   const html = await page.send('DOM.getOuterHTML', {
     nodeId: (await page.send('DOM.getDocument')).root.nodeId
   })
-
   logFlag.value = false
 
   return {
     html,
-    deps
+    deps: deps
+      .filter(e => constexprResources.indexOf(e) === -1)
+      .filter(e => e.startsWith(httpBase))
+      .filter(e => !e.endsWith('.html'))
   }
 }
 
 async function doTheThing(fsBase, httpBase, paths, browser) {
-  console.log(paths)
+  const htmls = {}
   for (let i=0; i<paths.length; i++) {
-    await processHtml(httpBase, paths[i], browser)
+    htmls[paths[i]] = await processHtml(httpBase, paths[i], browser)
   }
+  console.log(htmls)
 }
 
 module.exports = {
