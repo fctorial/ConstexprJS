@@ -1,7 +1,12 @@
 const lint = require('xml-formatter')
 const {sleep} = require("./utils");
+const any = require('promise.any')
+const fs = require("fs").promises;
+const path = require("path");
+const {log} = require("./utils");
+const {fileExists} = require("./utils");
 
-const tc = 1
+const taskCount = 5
 
 async function addDeps(page, deps, logFlag) {
   while (logFlag.value) {
@@ -14,7 +19,7 @@ async function addDeps(page, deps, logFlag) {
   }
 }
 
-async function processHtml(httpBase, path, browser) {
+async function processHtml(httpBase, path, browser, idx) {
   const {targetId} = await browser.send('Target.createTarget', {
     url: 'about:blank',
   })
@@ -35,14 +40,11 @@ async function processHtml(httpBase, path, browser) {
         if (! window._ConstexprJS_) {
           window._ConstexprJS_ = {}
         }
-        console.log('we"re here')
         window._ConstexprJS_.triggerCompilationHook = (args) => resolve(args)
       })`,
     awaitPromise: true,
     returnByValue: true
   })
-
-  console.log(constexprResources)
 
   const html = lint(
     (await page.send('DOM.getOuterHTML', {
@@ -53,9 +55,9 @@ async function processHtml(httpBase, path, browser) {
     }
   )
   logFlag.value = false
-  console.log(html)
   await browser.send('Target.closeTarget', { targetId })
   return {
+    idx,
     html,
     deps: deps
       .filter(e => constexprResources.indexOf(e) === -1)
@@ -67,16 +69,48 @@ async function processHtml(httpBase, path, browser) {
 
 async function doTheThing(fsBase, httpBase, paths, browser) {
   const htmls = {}
-  const results = await Promise.all(paths.map(path => processHtml(httpBase, path, browser)))
-  const allDeps = new Set()
+  const taskQueue = {}
+  const results = []
+  let next = 0
+  while (true) {
+    const tasks = Object.values(taskQueue)
+    if (next === paths.length && tasks.length === 0) {
+      break
+    }
+    if (tasks.length < taskCount && next < paths.length) {
+      taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
+      next++
+      log(`Queued file #${next}`)
+    } else {
+      const result = await any(tasks)
+      delete taskQueue[result.idx]
+      log(`Finished file #${result.idx + 1}`)
+      delete result.idx
+      results.push(result)
+    }
+  }
+  const allDepsSet = new Set()
   results.forEach(res => {
-    res.deps.forEach(d => allDeps.add(d))
+    res.deps.forEach(d => allDepsSet.add(d))
     delete res.deps
   })
-  for (let i = 0; i < paths.length; i++) {
-    htmls[paths[i]] = results[i]
+  const allDeps = [...allDepsSet]
+  const allDepsPresent = []
+  for (let i=0; i<allDeps.length; i++) {
+    const dep = path.join(fsBase, allDeps[i])
+    if (await fileExists(dep)) {
+      const stats = await fs.lstat(dep)
+      if (stats.isFile()) {
+        allDepsPresent.push(dep)
+      }
+    }
   }
-  await sleep(1000)
+  const htmlPaths = paths.map(p => path.join(fsBase, p))
+  for (let i = 0; i < paths.length; i++) {
+    htmls[htmlPaths[i]] = results[i]
+  }
+  // console.log(htmls)
+  // console.log(allDepsPresent)
 }
 
 module.exports = {

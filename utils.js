@@ -1,13 +1,16 @@
-const fs = require('fs').promises;
+const fs = require('fs');
+const fsp = require('fs').promises;
 const path = require('path');
 
 async function htmlFiles(fsBase, dir) {
-  let files = (await fs.readdir(dir)).map(file => path.join(dir, file));
-  let stats = await Promise.all(files.map(file => fs.stat(file)))
+  let files = (await fsp.readdir(dir)).map(file => path.join(dir, file));
+  let stats = await Promise.all(files.map(file => fsp.stat(file)))
   const htmls = []
   for (let i=0; i<files.length; i++) {
     if (stats[i].isFile() && files[i].toLowerCase().endsWith('.html')) {
-      htmls.push(files[i].replace(fsBase, ''))
+      let path = files[i].replace(fsBase, '');
+      log(`Found path: ${path}`)
+      htmls.push(path)
     } else if (stats[i].isDirectory()) {
       htmls.push(...(await htmlFiles(fsBase, files[i])))
     }
@@ -21,7 +24,33 @@ async function sleep(n) {
   })
 }
 
+function fileExists(f) {
+  return new Promise((resolve) => {
+    fs.access(f, (err) => {
+      if (err) {
+        resolve(false)
+      } else {
+        resolve(true)
+      }
+    })
+  })
+}
+
+let verbose = false
+function enableVerbose() {
+  verbose = true
+}
+
+function log(...args) {
+  if (verbose) {
+    console.log(...args)
+  }
+}
+
 module.exports = {
   htmlFiles,
-  sleep
+  sleep,
+  fileExists,
+  log,
+  enableVerbose
 }
