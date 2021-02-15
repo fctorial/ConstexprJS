@@ -4,15 +4,24 @@ const {spawnChrome} = require("chrome-debugging-client");
 const fs = require('fs')
 const path = require('path')
 const yargs = require('yargs/yargs')
+const {setJobCount} = require("./compiler");
 const {log} = require("./utils");
 const {enableVerbose} = require("./utils");
-const {doTheThing} = require("./compiler");
+const {compile} = require("./compiler");
 const {hideBin} = require('yargs/helpers')
 
 async function main() {
   const argv = yargs(hideBin(process.argv)).argv
   if (argv.verbose) {
     enableVerbose()
+  }
+  if (argv.jobs) {
+    try {
+      setJobCount(parseInt(argv.jobs))
+    } catch (e) {
+      console.log(`Invalid job count`)
+      process.exit(1)
+    }
   }
   if (
     !argv.input || !argv.output
@@ -69,7 +78,7 @@ async function main() {
     try {
       const browser = chrome.connection;
 
-      await doTheThing(input, `http://localhost:${port}`, paths, browser)
+      await compile(input, `http://localhost:${port}`, paths, browser)
 
       await chrome.close()
     } catch (e) {

@@ -6,7 +6,7 @@ const path = require("path");
 const {log} = require("./utils");
 const {fileExists} = require("./utils");
 
-const taskCount = 5
+let jobsCount = 5
 
 async function addDeps(page, deps, logFlag) {
   while (logFlag.value) {
@@ -67,7 +67,7 @@ async function processHtml(httpBase, path, browser, idx) {
   }
 }
 
-async function doTheThing(fsBase, httpBase, paths, browser) {
+async function compile(fsBase, httpBase, paths, browser) {
   const htmls = {}
   const taskQueue = {}
   const results = []
@@ -77,7 +77,7 @@ async function doTheThing(fsBase, httpBase, paths, browser) {
     if (next === paths.length && tasks.length === 0) {
       break
     }
-    if (tasks.length < taskCount && next < paths.length) {
+    if (tasks.length < jobsCount && next < paths.length) {
       taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
       next++
       log(`Queued file #${next}`)
@@ -114,5 +114,6 @@ async function doTheThing(fsBase, httpBase, paths, browser) {
 }
 
 module.exports = {
-  doTheThing
+  compile,
+  setJobCount: (n) => jobsCount = n
 }
