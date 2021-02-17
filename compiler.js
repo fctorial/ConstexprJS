@@ -38,15 +38,10 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
   await page.send('Runtime.evaluate', {
     expression: `
     (() => {
-      if (!window._ConstexprJS_) {
-        window._ConstexprJS_ = {}
-      }
-      
+      window._ConstexprJS_ = {}
       window._ConstexprJS_.finishedLoading = false
       window._ConstexprJS_.signalled = false
-      if (!window._ConstexprJS_.triggerCompilationHook) {
-        window._ConstexprJS_.triggerCompilationHook = null
-      }
+      window._ConstexprJS_.triggerCompilationHook = null
       
       window.addEventListener('load', () => {
         window._ConstexprJS_.finishedLoading = true
@@ -64,7 +59,7 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
           return
         }
         const compilerInputs = {
-          constexprResources: [...document.querySelectorAll('[constexpr][src]')].map(el => el.src)
+          constexprResources: [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
         }
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
@@ -73,16 +68,9 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
       }
       
       window._ConstexprJS_.triggerCompilation = (compilerInputs) => {
-        console.log(compilerInputs)
       
         function f() {
-          if (window._ConstexprJS_.triggerCompilationHook !== null) {
-            console.log('calling hook')
-            window._ConstexprJS_.triggerCompilationHook(compilerInputs)
-          } else {
-            console.log(window._ConstexprJS_.triggerCompilationHook)
-            setTimeout(f, 100)
-          }
+          window._ConstexprJS_.triggerCompilationHook(compilerInputs)
         }
       
         setTimeout(f, 100)
