@@ -3,25 +3,27 @@
 const {htmlFiles, isPortFree} = require("./utils");
 const {spawnChrome} = require("chrome-debugging-client");
 
+const yargs = require('yargs/yargs')
+const {hideBin} = require('yargs/helpers')
+
 const fs = require('fs')
 const path = require('path')
-const yargs = require('yargs/yargs')
 const {isChildOf} = require("./utils");
 const {setJobCount} = require("./compiler");
 const {log} = require("./utils");
 const {enableVerbose} = require("./utils");
 const {compile} = require("./compiler");
-const {hideBin} = require('yargs/helpers')
+
 
 function usage() {
   console.log(
-    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless]`
+    `Usage: constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless]`
   )
   process.exit(1)
 }
 
 async function main() {
-  const argv = yargs(hideBin(process.argv)).argv
+  const argv = yargs(hideBin(process.argv)).help(false).argv
   if (argv.help) {
     usage()
   }
