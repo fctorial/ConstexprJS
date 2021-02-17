@@ -19,7 +19,7 @@ async function addDeps(page, deps, logFlag) {
   }
 }
 
-async function processHtml(httpBase, path, exclusions, browser, idx) {
+async function processHtml(httpBase, path, browser, idx) {
   try {
     const {targetId} = await browser.send('Target.createTarget', {
       url: 'about:blank',
@@ -106,21 +106,21 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
       idx,
       path,
       html,
+      constexprResources,
       deps: deps
-        .filter(e => constexprResources.indexOf(e) === -1)
+        .filter(e => !constexprResources.some(ex => ex.endsWith(e)))
         .filter(e => e.startsWith(httpBase))
         .map(e => e.replace(httpBase, ''))
-        .filter(e => !exclusions.some(exc => e.startsWith(exc)))
-        .filter(e => !e.endsWith('.html'))
+        .filter(e => !e.endsWith(path))
     }
   } catch (e) {
-    console.error(`Error during processing file ${path}`)
+    console.error(`Error during processing file: ${path}`)
     console.trace(e)
     return 'error'
   }
 }
 
-async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) {
+async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) {
   log(`Using job count: ${jobsCount}`)
   const htmls = {}
   const taskQueue = {}
@@ -132,13 +132,13 @@ async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) 
       break
     }
     if (tasks.length < jobsCount && next < paths.length) {
-      taskQueue[next] = processHtml(httpBase, paths[next], exclusions, browser, next)
+      taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
       next++
       log(`Queued file #${next}:\t ${paths[next - 1]}`)
     } else {
       const result = await any(tasks)
+      delete taskQueue[result.idx]
       if (result !== 'error') {
-        delete taskQueue[result.idx]
         log(`Finished file #${result.idx + 1}:\t ${result.path}`)
         delete result.idx
         results.push(result)
@@ -151,13 +151,24 @@ async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) 
     delete res.deps
   })
   const allDeps = [...allDepsSet]
+  const allDepsToCopy = []
+  for (let dep of allDeps) {
+    if (isExcluded(dep)) {
+      log(`Excluding resource: ${dep}`)
+    } else {
+      log(`Copying resource: ${dep}`)
+      allDepsToCopy.push(dep)
+    }
+  }
   const allDepsPresent = []
-  for (let i=0; i<allDeps.length; i++) {
+  for (let i = 0; i < allDepsToCopy.length; i++) {
     const dep = path.join(fsBase, allDeps[i])
     if (await fileExists(dep)) {
       const stats = await fs.lstat(dep)
       if (stats.isFile()) {
         allDepsPresent.push(dep)
+      } else {
+        log(`Path not found on disk: ${dep}`)
       }
     }
   }

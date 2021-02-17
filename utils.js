@@ -2,17 +2,21 @@ const fs = require('fs');
 const fsp = require('fs').promises;
 const path = require('path');
 
-async function htmlFiles(fsBase, dir) {
+async function htmlFiles(fsBase, dir, isExcluded) {
   let files = (await fsp.readdir(dir)).map(file => path.join(dir, file));
   let stats = await Promise.all(files.map(file => fsp.stat(file)))
   const htmls = []
   for (let i=0; i<files.length; i++) {
     if (stats[i].isFile() && files[i].toLowerCase().endsWith('.html')) {
       let path = files[i].replace(fsBase, '');
-      log(`Found path: ${path}`)
-      htmls.push(path)
+      if (isExcluded(path)) {
+        log(`Ignoring path: ${path}`)
+      } else {
+        log(`Found path: ${path}`)
+        htmls.push(path)
+      }
     } else if (stats[i].isDirectory()) {
-      htmls.push(...(await htmlFiles(fsBase, files[i])))
+      htmls.push(...(await htmlFiles(fsBase, files[i], isExcluded)))
     }
   }
   return htmls
@@ -39,7 +43,8 @@ function fileExists(f) {
 const isChildOf = (child, parent) => {
   if (child === parent) return false
   const parentTokens = parent.split('/').filter(i => i.length)
-  return parentTokens.every((t, i) => child.split('/')[i] === t)
+  const childTokens = child.split('/').filter(i => i.length)
+  return parentTokens.every((t, i) => childTokens[i] === t)
 }
 
 let verbose = false

@@ -42,11 +42,17 @@ async function main() {
     usage()
   }
 
-  let exclusions
+  let isExcluded = () => false
   if (argv.exclusions) {
-    exclusions = argv.exclusions.split(':')
-  } else {
-    exclusions = []
+    const exclusionPaths = argv.exclusions.split(':')
+    isExcluded = path => {
+      for (let ep of exclusionPaths) {
+        if (path === ep || isChildOf(path, ep)) {
+          return true
+        }
+      }
+      return false
+    }
   }
 
   const input = path.resolve(argv.input)
@@ -98,14 +104,14 @@ async function main() {
   }
 
   try {
-    const paths = (await htmlFiles(input, input)).filter(p => !exclusions.some(exc => p.startsWith(exc)))
+    const paths = await htmlFiles(input, input, isExcluded)
     const chrome = spawnChrome({
       headless: !argv.noheadless
     });
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, paths, exclusions, browser)
+      await compile(input, output, `http://localhost:${port}`, paths, isExcluded, browser)
 
       await chrome.close()
     } catch (e) {
