@@ -15,7 +15,7 @@ const {hideBin} = require('yargs/helpers')
 
 function usage() {
   console.log(
-    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--force]`
+    `Usage: constexpr --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless]`
   )
   process.exit(1)
 }
@@ -65,22 +65,15 @@ async function main() {
     usage()
   }
 
-  if (! fs.existsSync(output)) {
+  if (!fs.existsSync(output)) {
     fs.mkdirSync(output)
   }
 
   {
-    const outputDirList = fs.readdirSync(output)
+    const outputDirList = fs.readdirSync(output).filter(e => !e.startsWith('.'))
     if (outputDirList.length !== 0) {
-      if (!argv.force) {
-        console.error('output directory is not empty')
-        process.exit(1)
-      } else {
-        log('"--force" provided, purging everything in output directory')
-        outputDirList.forEach(
-          child => fs.rmSync(path.join(output, child), {force: true, recursive: true})
-        )
-      }
+      console.error('output directory is not empty')
+      process.exit(1)
     } else if (
       isChildOf(input, output) || isChildOf(output, input)
     ) {
