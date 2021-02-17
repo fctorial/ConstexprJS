@@ -22,6 +22,9 @@ function usage() {
 
 async function main() {
   const argv = yargs(hideBin(process.argv)).argv
+  if (argv.help) {
+    usage()
+  }
   if (argv.verbose) {
     enableVerbose()
   }

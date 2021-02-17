@@ -20,23 +20,24 @@ async function addDeps(page, deps, logFlag) {
 }
 
 async function processHtml(httpBase, path, exclusions, browser, idx) {
-  const {targetId} = await browser.send('Target.createTarget', {
-    url: 'about:blank',
-  })
-  const page = await browser.attachToTarget(targetId)
-  await page.send('Page.enable')
-  await page.send('Network.enable')
+  try {
+    const {targetId} = await browser.send('Target.createTarget', {
+      url: 'about:blank',
+    })
+    const page = await browser.attachToTarget(targetId)
+    await page.send('Page.enable')
+    await page.send('Network.enable')
 
-  const deps = []
-  const logFlag = {value: true}
-  addDeps(page, deps, logFlag)
+    const deps = []
+    const logFlag = {value: true}
+    addDeps(page, deps, logFlag)
 
-  await page.send('Page.navigate', {
-    url: `${httpBase}${path}`
-  })
+    await page.send('Page.navigate', {
+      url: `${httpBase}${path}`
+    })
 
-  await page.send('Runtime.evaluate', {
-    expression: `
+    await page.send('Runtime.evaluate', {
+      expression: `
     (() => {
       window._ConstexprJS_ = {}
       window._ConstexprJS_.finishedLoading = false
@@ -77,44 +78,50 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
       }
     })()
     `,
-    awaitPromise: true
-  })
+      awaitPromise: true
+    })
 
-  const {result: {value: {constexprResources}}} = await page.send('Runtime.evaluate', {
-    expression: `new Promise((resolve, reject) => {
+    const {result: {value: {constexprResources}}} = await page.send('Runtime.evaluate', {
+      expression: `new Promise((resolve, reject) => {
         if (! window._ConstexprJS_) {
           window._ConstexprJS_ = {}
         }
         window._ConstexprJS_.triggerCompilationHook = (args) => resolve(args)
       })`,
-    awaitPromise: true,
-    returnByValue: true
-  })
+      awaitPromise: true,
+      returnByValue: true
+    })
 
-  const html = formatHtml(
-    (await page.send('DOM.getOuterHTML', {
-      nodeId: (await page.send('DOM.getDocument')).root.nodeId
-    })).outerHTML,
-    {
-      lineSeparator: '\n'
+    const html = formatHtml(
+      (await page.send('DOM.getOuterHTML', {
+        nodeId: (await page.send('DOM.getDocument')).root.nodeId
+      })).outerHTML,
+      {
+        lineSeparator: '\n'
+      }
+    )
+    logFlag.value = false
+    await browser.send('Target.closeTarget', {targetId})
+    return {
+      idx,
+      path,
+      html,
+      deps: deps
+        .filter(e => constexprResources.indexOf(e) === -1)
+        .filter(e => e.startsWith(httpBase))
+        .map(e => e.replace(httpBase, ''))
+        .filter(e => !exclusions.some(exc => e.startsWith(exc)))
+        .filter(e => !e.endsWith('.html'))
     }
-  )
-  logFlag.value = false
-  await browser.send('Target.closeTarget', { targetId })
-  return {
-    idx,
-    path,
-    html,
-    deps: deps
-      .filter(e => constexprResources.indexOf(e) === -1)
-      .filter(e => e.startsWith(httpBase))
-      .map(e => e.replace(httpBase, ''))
-      .filter(e => !exclusions.some(exc => e.startsWith(exc)))
-      .filter(e => !e.endsWith('.html'))
+  } catch (e) {
+    console.error(`Error during processing file ${path}`)
+    console.trace(e)
+    return 'error'
   }
 }
 
 async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) {
+  log(`Using job count: ${jobsCount}`)
   const htmls = {}
   const taskQueue = {}
   const results = []
@@ -127,13 +134,15 @@ async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) 
     if (tasks.length < jobsCount && next < paths.length) {
       taskQueue[next] = processHtml(httpBase, paths[next], exclusions, browser, next)
       next++
-      log(`Queued file #${next}`)
+      log(`Queued file #${next}:\t ${paths[next - 1]}`)
     } else {
       const result = await any(tasks)
-      delete taskQueue[result.idx]
-      log(`Finished file #${result.idx + 1}`)
-      delete result.idx
-      results.push(result)
+      if (result !== 'error') {
+        delete taskQueue[result.idx]
+        log(`Finished file #${result.idx + 1}:\t ${result.path}`)
+        delete result.idx
+        results.push(result)
+      }
     }
   }
   const allDepsSet = new Set()
@@ -156,17 +165,20 @@ async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) 
     htmls[path.join(fsBase, results[i].path)] = results[i].html
   }
 
-  for (let inp of allDepsPresent) {
-    const out = inp.replace(fsBase, outFsBase)
-    const dir = path.dirname(out)
-    await fs.mkdir(dir, {recursive: true})
-    await fs.copyFile(inp, out)
-  }
   for (let p of Object.keys(htmls)) {
     const out = p.replace(fsBase, outFsBase)
     const dir = path.dirname(out)
     await fs.mkdir(dir, {recursive: true})
     await fs.writeFile(out, htmls[p])
+  }
+  for (let inp of allDepsPresent) {
+    const out = inp.replace(fsBase, outFsBase)
+    if (await fileExists(out)) {
+      continue
+    }
+    const dir = path.dirname(out)
+    await fs.mkdir(dir, {recursive: true})
+    await fs.copyFile(inp, out)
   }
 }
 
