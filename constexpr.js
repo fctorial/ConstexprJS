@@ -60,16 +60,25 @@ async function main() {
     fs.mkdirSync(output)
   }
 
-  if (fs.readdirSync(output).length !== 0 && !argv.force) {
-    console.error('output directory is not empty')
-    process.exit(1)
-  } else if (
-    isChildOf(input, output) || isChildOf(output, input)
-  ) {
-    console.error('input and output directories must not be inside each other')
-    process.exit(1)
+  {
+    const outputDirList = fs.readdirSync(output)
+    if (outputDirList.length !== 0) {
+      if (!argv.force) {
+        console.error('output directory is not empty')
+        process.exit(1)
+      } else {
+        log('"--force" provided, purging everything in output directory')
+        outputDirList.forEach(
+          child => fs.rmSync(path.join(output, child), {force: true, recursive: true})
+        )
+      }
+    } else if (
+      isChildOf(input, output) || isChildOf(output, input)
+    ) {
+      console.error('input and output directories must not be inside each other')
+      process.exit(1)
+    }
   }
-
   const express = require('express')
   const app = express()
   app.use(express.static(input))
@@ -88,12 +97,12 @@ async function main() {
   try {
     const paths = (await htmlFiles(input, input)).filter(p => !exclusions.some(exc => p.startsWith(exc)))
     const chrome = spawnChrome({
-      headless: true
+      headless: !argv.noheadless
     });
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, paths, exclusions, browser, !!argv.force)
+      await compile(input, output, `http://localhost:${port}`, paths, exclusions, browser)
 
       await chrome.close()
     } catch (e) {

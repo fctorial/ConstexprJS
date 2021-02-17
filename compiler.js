@@ -126,7 +126,7 @@ async function processHtml(httpBase, path, exclusions, browser, idx) {
   }
 }
 
-async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser, force) {
+async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser) {
   const htmls = {}
   const taskQueue = {}
   const results = []
@@ -172,16 +172,12 @@ async function compile(fsBase, outFsBase, httpBase, paths, exclusions, browser, 
     const out = inp.replace(fsBase, outFsBase)
     const dir = path.dirname(out)
     await fs.mkdir(dir, {recursive: true})
-    if (await fileExists(out) && !force) {
-      console.log(`Skipping ${out}, it already exists`)
-    }
     await fs.copyFile(inp, out)
   }
   for (let p of Object.keys(htmls)) {
     const out = p.replace(fsBase, outFsBase)
-    if (await fileExists(out) && !force) {
-      console.log(`Skipping ${out}, it already exists`)
-    }
+    const dir = path.dirname(out)
+    await fs.mkdir(dir, {recursive: true})
     await fs.writeFile(out, htmls[p])
   }
 }
