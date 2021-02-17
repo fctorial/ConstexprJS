@@ -3,7 +3,7 @@ const fsp = require('fs').promises;
 const path = require('path');
 
 async function htmlFiles(fsBase, dir, isExcluded) {
-  let files = (await fsp.readdir(dir)).map(file => path.join(dir, file));
+  let files = (await fsp.readdir(dir)).filter(e => !e.startsWith('.')).map(file => path.join(dir, file));
   let stats = await Promise.all(files.map(file => fsp.stat(file)))
   const htmls = []
   for (let i=0; i<files.length; i++) {

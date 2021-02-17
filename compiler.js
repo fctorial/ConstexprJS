@@ -151,25 +151,13 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
     delete res.deps
   })
   const allDeps = [...allDepsSet]
-  const allDepsToCopy = []
+  const allFilesToCopy = []
   for (let dep of allDeps) {
     if (isExcluded(dep)) {
       log(`Excluding resource: ${dep}`)
     } else {
       log(`Copying resource: ${dep}`)
-      allDepsToCopy.push(dep)
-    }
-  }
-  const allDepsPresent = []
-  for (let i = 0; i < allDepsToCopy.length; i++) {
-    const dep = path.join(fsBase, allDeps[i])
-    if (await fileExists(dep)) {
-      const stats = await fs.lstat(dep)
-      if (stats.isFile()) {
-        allDepsPresent.push(dep)
-      } else {
-        log(`Path not found on disk: ${dep}`)
-      }
+      allFilesToCopy.push(path.join(fsBase, dep))
     }
   }
   for (let i = 0; i < paths.length; i++) {
@@ -182,14 +170,18 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
     await fs.mkdir(dir, {recursive: true})
     await fs.writeFile(out, htmls[p])
   }
-  for (let inp of allDepsPresent) {
+  for (let inp of allFilesToCopy) {
     const out = inp.replace(fsBase, outFsBase)
     if (await fileExists(out)) {
       continue
     }
     const dir = path.dirname(out)
     await fs.mkdir(dir, {recursive: true})
-    await fs.copyFile(inp, out)
+    try {
+      await fs.copyFile(inp, out)
+    } catch (e) {
+      log(`Error while copying file: ${inp}`)
+    }
   }
 }
 
