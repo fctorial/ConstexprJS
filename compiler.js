@@ -7,6 +7,7 @@ const {log} = require("./utils");
 const {fileExists} = require("./utils");
 
 let jobsCount = 5
+let jobTimeout = 999999999
 
 async function addDeps(page, deps, logFlag) {
   while (logFlag.value) {
@@ -43,6 +44,7 @@ async function processHtml(httpBase, path, browser, idx) {
       window._ConstexprJS_.finishedLoading = false
       window._ConstexprJS_.signalled = false
       window._ConstexprJS_.triggerCompilationHook = null
+      window._ConstexprJS_.compilationErrorHook = null
       
       window.addEventListener('load', () => {
         window._ConstexprJS_.finishedLoading = true
@@ -54,24 +56,25 @@ async function processHtml(httpBase, path, browser, idx) {
         window._ConstexprJS_.finishedLoading = document.readyState !== 'loading'
         window._ConstexprJS_.tryCompilation()
       }
+      window._ConstexprJS_.abort = (message) => {
+        window._ConstexprJS_.compilationErrorHook(message)
+      }
       
       window._ConstexprJS_.tryCompilation = () => {
         if (!window._ConstexprJS_.finishedLoading || !window._ConstexprJS_.signalled) {
           return
         }
-        const compilerInputs = {
-          constexprResources: [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
-        }
+        const constexprResources = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilation(compilerInputs), 1000)
+        setTimeout(() => window._ConstexprJS_.triggerCompilation(constexprResources), 1000)
       }
       
-      window._ConstexprJS_.triggerCompilation = (compilerInputs) => {
+      window._ConstexprJS_.triggerCompilation = (constexprResources) => {
       
         function f() {
-          window._ConstexprJS_.triggerCompilationHook(compilerInputs)
+          window._ConstexprJS_.triggerCompilationHook(constexprResources)
         }
       
         setTimeout(f, 100)
@@ -81,16 +84,31 @@ async function processHtml(httpBase, path, browser, idx) {
       awaitPromise: true
     })
 
-    const {result: {value: {constexprResources}}} = await page.send('Runtime.evaluate', {
-      expression: `new Promise((resolve, reject) => {
-        if (! window._ConstexprJS_) {
-          window._ConstexprJS_ = {}
-        }
-        window._ConstexprJS_.triggerCompilationHook = (args) => resolve(args)
+    const {result: {value: {status, message, constexprResources}}} = await page.send('Runtime.evaluate', {
+      expression: `new Promise((resolve) => {
+        setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
+        window._ConstexprJS_.triggerCompilationHook = (constexprResources) => resolve({status: 'ok', constexprResources})
+        window._ConstexprJS_.compilationErrorHook = (message) => resolve({status: 'abort', message})
       })`,
       awaitPromise: true,
       returnByValue: true
     })
+
+    if (status === 'abort') {
+      console.error(`Page ${path} signalled an abortion: ${message}`)
+      await browser.send('Target.closeTarget', {targetId})
+      return {
+        status: 'error',
+        idx
+      }
+    } else if (status === 'timeout') {
+      console.error(`Timeout reached when processing file: ${path}`)
+      await browser.send('Target.closeTarget', {targetId})
+      return {
+        status: 'timeout',
+        idx
+      }
+    }
 
     const html = formatHtml(
       (await page.send('DOM.getOuterHTML', {
@@ -103,6 +121,7 @@ async function processHtml(httpBase, path, browser, idx) {
     logFlag.value = false
     await browser.send('Target.closeTarget', {targetId})
     return {
+      status: 'ok',
       idx,
       path,
       html,
@@ -114,17 +133,21 @@ async function processHtml(httpBase, path, browser, idx) {
         .filter(e => !e.endsWith(path))
     }
   } catch (e) {
+    try {
+      await browser.send('Target.closeTarget', {targetId})
+    } catch (e) {}
     console.error(`Error during processing file: ${path}`)
     console.trace(e)
-    return 'error'
+    return {
+      status: 'error',
+      idx
+    }
   }
 }
 
-async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) {
-  log(`Using job count: ${jobsCount}`)
-  const htmls = {}
-  const taskQueue = {}
+async function compilePaths(paths, httpBase, browser) {
   const results = []
+  const taskQueue = {}
   let next = 0
   while (true) {
     const tasks = Object.values(taskQueue)
@@ -138,13 +161,20 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
     } else {
       const result = await any(tasks)
       delete taskQueue[result.idx]
-      if (result !== 'error') {
+      if (result.status === 'ok') {
         log(`Finished file #${result.idx + 1}:\t ${result.path}`)
         delete result.idx
         results.push(result)
       }
     }
   }
+  return results;
+}
+
+async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) {
+  log(`Using job count: ${jobsCount}`)
+  log(`Using job timeout: ${jobTimeout}`)
+  const results = await compilePaths(paths, httpBase, browser);
   const allDepsSet = new Set()
   results.forEach(res => {
     res.deps.forEach(d => allDepsSet.add(d))
@@ -160,7 +190,8 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
       allFilesToCopy.push(path.join(fsBase, dep))
     }
   }
-  for (let i = 0; i < paths.length; i++) {
+  const htmls = {}
+  for (let i = 0; i < results.length; i++) {
     htmls[path.join(fsBase, results[i].path)] = results[i].html
   }
 
@@ -187,5 +218,6 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
 
 module.exports = {
   compile,
-  setJobCount: (n) => jobsCount = n
+  setJobCount: (n) => jobsCount = n,
+  setJobTimeout: (n) => jobTimeout = n
 }

@@ -9,15 +9,14 @@ const {hideBin} = require('yargs/helpers')
 const fs = require('fs')
 const path = require('path')
 const {isChildOf} = require("./utils");
-const {setJobCount} = require("./compiler");
+const {setJobCount, setJobTimeout, compile} = require("./compiler");
 const {log} = require("./utils");
 const {enableVerbose} = require("./utils");
-const {compile} = require("./compiler");
 
 
 function usage() {
   console.log(
-    `Usage: constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless]`
+    `Usage: constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout]`
   )
   process.exit(1)
 }
@@ -35,6 +34,14 @@ async function main() {
       setJobCount(parseInt(argv.jobs))
     } catch (e) {
       console.log(`Invalid job count`)
+      process.exit(1)
+    }
+  }
+  if (argv.jobtimeout) {
+    try {
+      setJobTimeout(parseInt(argv.jobtimeout))
+    } catch (e) {
+      console.log(`Invalid job timeout`)
       process.exit(1)
     }
   }

@@ -10,7 +10,7 @@ A static site generator without a DSL
 
 ### Command line options:
 
-    constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless]
+    constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout]
 
 ### [Guide](https://fctorial.github.io/posts/constexpr.js.html)
 
