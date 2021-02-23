@@ -95,7 +95,7 @@ async function processHtml(httpBase, path, browser, idx) {
     })
 
     if (status === 'abort') {
-      console.error(`Page ${path} signalled an abortion: ${message}`)
+      log(`Page ${path} signalled an abortion: ${message}`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'error',
