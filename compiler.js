@@ -3,7 +3,7 @@ const {sleep} = require("./utils");
 const any = require('promise.any')
 const fs = require("fs").promises;
 const path = require("path");
-const {fileExists, log, warn, error} = require("./utils");
+const {fileExists, log, warn, error, align} = require("./utils");
 
 let jobsCount = 5
 let jobTimeout = 999999999
@@ -97,7 +97,8 @@ async function processHtml(httpBase, path, browser, idx) {
       warn(`Page ${path} signalled an abortion, message: "${message}"`)
       await browser.send('Target.closeTarget', {targetId})
       return {
-        status: 'error',
+        status: 'abortion',
+        path,
         idx
       }
     } else if (status === 'timeout') {
@@ -105,6 +106,7 @@ async function processHtml(httpBase, path, browser, idx) {
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'timeout',
+        path,
         idx
       }
     }
@@ -139,6 +141,7 @@ async function processHtml(httpBase, path, browser, idx) {
     console.trace(e)
     return {
       status: 'error',
+      path,
       idx
     }
   }
@@ -148,6 +151,7 @@ async function compilePaths(paths, httpBase, browser) {
   const results = []
   const taskQueue = {}
   let next = 0
+  let done = 0
   while (true) {
     const tasks = Object.values(taskQueue)
     if (next === paths.length && tasks.length === 0) {
@@ -156,14 +160,17 @@ async function compilePaths(paths, httpBase, browser) {
     if (tasks.length < jobsCount && next < paths.length) {
       taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
       next++
-      log(`Queued file #${next}:\t ${paths[next - 1]}`)
+      log(align(`Queued file #${next}:`, 30), `${paths[next - 1]}`)
     } else {
       const result = await any(tasks)
+      done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {
-        log(`Finished file #${result.idx + 1}:\t ${result.path}`)
+        log(align(`(${done}/${paths.length}) Finished:`, 30), `${result.path}`)
         delete result.idx
         results.push(result)
+      } else {
+        log(align(`(${done}/${paths.length}) (${result.status}):`, 30), `${result.path}`)
       }
     }
   }
@@ -171,8 +178,8 @@ async function compilePaths(paths, httpBase, browser) {
 }
 
 async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) {
-  log(`Using job count: ${jobsCount}`)
-  log(`Using job timeout: ${jobTimeout}`)
+  log(align(`Using job count:`, 30), `${jobsCount}`)
+  log(align(`Using job timeout:`, 30), `${jobTimeout}`)
   const results = await compilePaths(paths, httpBase, browser);
   const allDepsSet = new Set()
   results.forEach(res => {
@@ -185,7 +192,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
     if (isExcluded(dep)) {
       warn(`Excluding resource: ${dep}`)
     } else {
-      log(`Copying resource: ${dep}`)
+      log(align(`Copying resource:`, 30), `${dep}`)
       allFilesToCopy.push(path.join(fsBase, dep))
     }
   }

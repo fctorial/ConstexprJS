@@ -98,7 +98,7 @@ async function main() {
     port++
     try {
       server = app.listen(port)
-      log(`Using port ${port}`)
+      log(align(`Using port:`, 30), `${port}`)
     } catch (e) {
       log(`Port ${port} occupied`)
     }

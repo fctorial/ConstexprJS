@@ -12,7 +12,7 @@ async function htmlFiles(fsBase, dir, isExcluded) {
       if (isExcluded(path)) {
         warn(`Ignoring path: ${path}`)
       } else {
-        log(`Found path: ${path}`)
+        log(align(`Found path:`, 30), `${path}`)
         htmls.push(path)
       }
     } else if (stats[i].isDirectory()) {
@@ -68,6 +68,14 @@ function error(...args) {
   logger.color('red').underscore().log(...args)
 }
 
+function align(s, n) {
+  if (s.length >= n) {
+    return s
+  } else {
+    return s + ' '.repeat(n - s.length)
+  }
+}
+
 module.exports = {
   htmlFiles,
   sleep,
@@ -75,6 +83,7 @@ module.exports = {
   log,
   warn,
   error,
+  align,
   enableVerbose,
   isChildOf
 }
