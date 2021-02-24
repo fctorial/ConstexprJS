@@ -52,16 +52,19 @@ function enableVerbose() {
   verbose = true
 }
 
-const logger = require('node-color-log');
 const chalk = require('chalk')
 
 function clog(color, ...args) {
   if (verbose) {
-    console.log(chalk.hex(color)(...args))
+    if (color) {
+      console.log(chalk.hex(color)(...args))
+    } else {
+      console.log(...args)
+    }
   }
 }
 function log(...args) {
-  clog('#ffffff', ...args)
+  clog(false, ...args)
 }
 function warn(...args) {
   clog('#ffff00', ...args)
