@@ -10,7 +10,7 @@ async function htmlFiles(fsBase, dir, isExcluded) {
     if (stats[i].isFile() && files[i].toLowerCase().endsWith('.html')) {
       let path = files[i].replace(fsBase, '');
       if (isExcluded(path)) {
-        log(`Ignoring path: ${path}`)
+        warn(`Ignoring path: ${path}`)
       } else {
         log(`Found path: ${path}`)
         htmls.push(path)
@@ -52,10 +52,20 @@ function enableVerbose() {
   verbose = true
 }
 
+const logger = require('node-color-log');
+
 function log(...args) {
   if (verbose) {
-    console.log(...args)
+    logger.log(...args)
   }
+}
+function warn(...args) {
+  if (verbose) {
+    logger.color('yellow').log(...args)
+  }
+}
+function error(...args) {
+  logger.color('red').underscore().log(...args)
 }
 
 module.exports = {
@@ -63,6 +73,8 @@ module.exports = {
   sleep,
   fileExists,
   log,
+  warn,
+  error,
   enableVerbose,
   isChildOf
 }

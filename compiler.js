@@ -3,8 +3,7 @@ const {sleep} = require("./utils");
 const any = require('promise.any')
 const fs = require("fs").promises;
 const path = require("path");
-const {log} = require("./utils");
-const {fileExists} = require("./utils");
+const {fileExists, log, warn, error} = require("./utils");
 
 let jobsCount = 5
 let jobTimeout = 999999999
@@ -95,14 +94,14 @@ async function processHtml(httpBase, path, browser, idx) {
     })
 
     if (status === 'abort') {
-      log(`Page ${path} signalled an abortion: ${message}`)
+      warn(`Page ${path} signalled an abortion, message: "${message}"`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'error',
         idx
       }
     } else if (status === 'timeout') {
-      console.error(`Timeout reached when processing file: ${path}`)
+      error(`Timeout reached when processing file: ${path}`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'timeout',
@@ -136,7 +135,7 @@ async function processHtml(httpBase, path, browser, idx) {
     try {
       await browser.send('Target.closeTarget', {targetId})
     } catch (e) {}
-    console.error(`Error during processing file: ${path}`)
+    error(`Error during processing file: ${path}`)
     console.trace(e)
     return {
       status: 'error',
@@ -184,7 +183,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
   const allFilesToCopy = []
   for (let dep of allDeps) {
     if (isExcluded(dep)) {
-      log(`Excluding resource: ${dep}`)
+      warn(`Excluding resource: ${dep}`)
     } else {
       log(`Copying resource: ${dep}`)
       allFilesToCopy.push(path.join(fsBase, dep))
@@ -211,7 +210,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
     try {
       await fs.copyFile(inp, out)
     } catch (e) {
-      log(`Error while copying file: ${inp}`)
+      warn(`Couldn't copy file: ${inp}`)
     }
   }
 }

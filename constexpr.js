@@ -10,9 +10,8 @@ const fs = require('fs')
 const path = require('path')
 const {isChildOf} = require("./utils");
 const {setJobCount, setJobTimeout, compile} = require("./compiler");
-const {log} = require("./utils");
+const {log, error} = require("./utils");
 const {enableVerbose} = require("./utils");
-
 
 function usage() {
   console.log(
@@ -81,12 +80,12 @@ async function main() {
   {
     const outputDirList = fs.readdirSync(output).filter(e => !e.startsWith('.'))
     if (outputDirList.length !== 0) {
-      console.error('output directory is not empty')
+      error('output directory is not empty')
       process.exit(1)
     } else if (
       isChildOf(input, output) || isChildOf(output, input)
     ) {
-      console.error('input and output directories must not be inside each other')
+      error('input and output directories must not be inside each other')
       process.exit(1)
     }
   }
