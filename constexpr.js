@@ -10,7 +10,7 @@ const fs = require('fs')
 const path = require('path')
 const {isChildOf} = require("./utils");
 const {setJobCount, setJobTimeout, compile} = require("./compiler");
-const {log, error} = require("./utils");
+const {log, error, align} = require("./utils");
 const {enableVerbose} = require("./utils");
 
 function usage() {
@@ -97,8 +97,10 @@ async function main() {
   while (server === null) {
     port++
     try {
-      server = app.listen(port)
-      log(align(`Using port:`, 30), `${port}`)
+      server = await new Promise((resolve, reject) => {
+        const tempServer = app.listen(port, () => resolve(tempServer)).on('error', () => reject())
+      })
+      log(align(`Using port:`), `${port}`)
     } catch (e) {
       log(`Port ${port} occupied`)
     }

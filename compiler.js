@@ -94,7 +94,7 @@ async function processHtml(httpBase, path, browser, idx) {
     })
 
     if (status === 'abort') {
-      warn(`Page ${path} signalled an abortion, message: "${message}"`)
+      warn(align(`Page ${path} signalled an abortion, message:`), `"${message}"`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'abortion',
@@ -149,7 +149,7 @@ async function processHtml(httpBase, path, browser, idx) {
 
 const {range} = require('lodash')
 async function compilePaths(paths, httpBase, browser) {
-  const COLORS = range(paths.length).map(() => randomColor())
+  const COLORS = range(paths.length).map((i) => randomColor(i))
 
   const results = []
   const taskQueue = {}
@@ -163,17 +163,17 @@ async function compilePaths(paths, httpBase, browser) {
     if (tasks.length < jobsCount && next < paths.length) {
       taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
       next++
-      clog(COLORS[next-1], align(`Queued file #${next}:`, 30), `${paths[next - 1]}`)
+      clog(COLORS[next-1], align(`Queued file #${next}:`), `${paths[next - 1]}`)
     } else {
       const result = await any(tasks)
       done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {
-        clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`, 30), `${result.path}`)
+        clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`), `${result.path}`)
         delete result.idx
         results.push(result)
       } else {
-        clog(COLORS[result.idx], align(`(${done}/${paths.length}) (${result.status}):`, 30), `${result.path}`)
+        clog(COLORS[result.idx], align(`(${done}/${paths.length}) (${result.status}):`), `${result.path}`)
       }
     }
   }
@@ -181,8 +181,8 @@ async function compilePaths(paths, httpBase, browser) {
 }
 
 async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) {
-  log(align(`Using job count:`, 30), `${jobsCount}`)
-  log(align(`Using job timeout:`, 30), `${jobTimeout}`)
+  log(align(`Using job count:`), `${jobsCount}`)
+  log(align(`Using job timeout:`), `${jobTimeout}`)
   const results = await compilePaths(paths, httpBase, browser);
   const allDepsSet = new Set()
   results.forEach(res => {
@@ -193,9 +193,9 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
   const allFilesToCopy = []
   for (let dep of allDeps) {
     if (isExcluded(dep)) {
-      warn(align(`Excluding resource:`, 30), `${dep}`)
+      warn(align(`Excluding resource:`), `${dep}`)
     } else {
-      log(align(`Copying resource:`, 30), `${dep}`)
+      log(align(`Copying resource:`), `${dep}`)
       allFilesToCopy.push(path.join(fsBase, dep))
     }
   }
@@ -220,7 +220,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
     try {
       await fs.copyFile(inp, out)
     } catch (e) {
-      warn(`Couldn't copy file: ${inp}`)
+      warn(align(`Couldn't copy file:`), `${inp}`)
     }
   }
 }

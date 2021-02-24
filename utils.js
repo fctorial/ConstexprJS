@@ -10,9 +10,9 @@ async function htmlFiles(fsBase, dir, isExcluded) {
     if (stats[i].isFile() && files[i].toLowerCase().endsWith('.html')) {
       let path = files[i].replace(fsBase, '');
       if (isExcluded(path)) {
-        warn(`Ignoring path: ${path}`)
+        warn(align(`Ignoring path:`), `${path}`)
       } else {
-        log(align(`Found path:`, 30), `${path}`)
+        log(align(`Found path:`), `${path}`)
         htmls.push(path)
       }
     } else if (stats[i].isDirectory()) {
@@ -53,13 +53,25 @@ function enableVerbose() {
 }
 
 const chalk = require('chalk')
+const bg1 = '#1a1a1a'
+const bg2 = '#2b2b2b'
+let evenLine = true
+function logLine(c, ...args) {
+  console.log(c(...args))
+  // if (evenLine) {
+  //   console.log(c.bgHex(bg1)(...args))
+  // } else {
+  //   console.log(c.bgHex(bg2)(...args))
+  // }
+  // evenLine = !evenLine
+}
 
 function clog(color, ...args) {
   if (verbose) {
     if (color) {
-      console.log(chalk.hex(color)(...args))
+      logLine(chalk.hex(color), ...args)
     } else {
-      console.log(...args)
+      logLine(chalk, ...args)
     }
   }
 }
@@ -67,28 +79,66 @@ function log(...args) {
   clog(false, ...args)
 }
 function warn(...args) {
-  clog('#ffff00', ...args)
+  logLine(chalk.hex('#ffff00').bold, ...args)
 }
 function error(...args) {
-  console.log(chalk.red().underline(...args))
+  logLine(chalk.red().underline, ...args)
 }
 
-function align(s, n) {
-  if (s.length >= n) {
+function align(s) {
+  if (s.length >= 60) {
     return s
   } else {
-    return s + ' '.repeat(n - s.length)
+    return s + '-'.repeat(60 - s.length)
   }
 }
 
-function randomHex(rand) {
-  return rand(256).toString(16)
+const fac = 0.7
+function tooClose(r1, r2, r3) {
+  const sorted = [r1, r2, r3].sort((a, b) => a-b)
+  // console.log(sorted)
+  return sorted[0]/sorted[1] > fac || sorted[1]/sorted[2] > fac
+}
+
+function shuffle(rand, arr) {
+  let result = []
+  while (arr.length !== 0) {
+    let idx = rand(arr.length)
+    result.push(arr[idx])
+    arr.splice(idx, 1)
+  }
+  return result
 }
 
 const random = require('random-seed')
+const {clamp} = require("lodash");
 function randomColor(s) {
   const rand = random.create(s)
-  return '#' + randomHex(rand) + randomHex(rand) + randomHex(rand)
+  let r
+  let g
+  let b
+  do {
+    const r1 = rand(200) + 56
+    const r2 = rand(200) + 56
+    const r3 = rand(200) + 56
+    let cols = shuffle(rand, [r1, r2, r3])
+    r = cols[0]
+    g = cols[1]
+    b = cols[2]
+  } while (tooClose(r, g, b))
+  return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0')
+}
+
+if (require.main === module) {
+  const rc = require('randomcolor')
+  verbose = true
+  for (let i=0; i<100; i++) {
+    let color = randomColor(i);
+    // let color = rc({
+    //   luminosity: 'bright'
+    // });
+    clog(color, color)
+  }
 }
 
 module.exports = {
