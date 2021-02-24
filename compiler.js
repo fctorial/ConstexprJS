@@ -3,7 +3,7 @@ const {sleep} = require("./utils");
 const any = require('promise.any')
 const fs = require("fs").promises;
 const path = require("path");
-const {fileExists, log, warn, error, align} = require("./utils");
+const {fileExists, clog, log, warn, error, align, randomColor} = require("./utils");
 
 let jobsCount = 5
 let jobTimeout = 999999999
@@ -147,7 +147,10 @@ async function processHtml(httpBase, path, browser, idx) {
   }
 }
 
+const {range} = require('lodash')
 async function compilePaths(paths, httpBase, browser) {
+  const COLORS = range(paths.length).map(() => randomColor())
+
   const results = []
   const taskQueue = {}
   let next = 0
@@ -160,17 +163,17 @@ async function compilePaths(paths, httpBase, browser) {
     if (tasks.length < jobsCount && next < paths.length) {
       taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
       next++
-      log(align(`Queued file #${next}:`, 30), `${paths[next - 1]}`)
+      clog(COLORS[next-1], align(`Queued file #${next}:`, 30), `${paths[next - 1]}`)
     } else {
       const result = await any(tasks)
       done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {
-        log(align(`(${done}/${paths.length}) Finished:`, 30), `${result.path}`)
+        clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`, 30), `${result.path}`)
         delete result.idx
         results.push(result)
       } else {
-        log(align(`(${done}/${paths.length}) (${result.status}):`, 30), `${result.path}`)
+        clog(COLORS[result.idx], align(`(${done}/${paths.length}) (${result.status}):`, 30), `${result.path}`)
       }
     }
   }
@@ -190,7 +193,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) 
   const allFilesToCopy = []
   for (let dep of allDeps) {
     if (isExcluded(dep)) {
-      warn(`Excluding resource: ${dep}`)
+      warn(align(`Excluding resource:`, 30), `${dep}`)
     } else {
       log(align(`Copying resource:`, 30), `${dep}`)
       allFilesToCopy.push(path.join(fsBase, dep))

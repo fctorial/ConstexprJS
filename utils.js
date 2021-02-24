@@ -53,19 +53,21 @@ function enableVerbose() {
 }
 
 const logger = require('node-color-log');
+const chalk = require('chalk')
 
-function log(...args) {
+function clog(color, ...args) {
   if (verbose) {
-    logger.log(...args)
+    console.log(chalk.hex(color)(...args))
   }
+}
+function log(...args) {
+  clog('#ffffff', ...args)
 }
 function warn(...args) {
-  if (verbose) {
-    logger.color('yellow').log(...args)
-  }
+  clog('#ffff00', ...args)
 }
 function error(...args) {
-  logger.color('red').underscore().log(...args)
+  console.log(chalk.red().underline(...args))
 }
 
 function align(s, n) {
@@ -76,14 +78,26 @@ function align(s, n) {
   }
 }
 
+function randomHex(rand) {
+  return rand(256).toString(16)
+}
+
+const random = require('random-seed')
+function randomColor(s) {
+  const rand = random.create(s)
+  return '#' + randomHex(rand) + randomHex(rand) + randomHex(rand)
+}
+
 module.exports = {
   htmlFiles,
   sleep,
   fileExists,
+  clog,
   log,
   warn,
   error,
   align,
+  randomColor,
   enableVerbose,
   isChildOf
 }

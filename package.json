@@ -20,10 +20,12 @@
   "author": "fctorial <fctorial@gmail.com> (https://fctorial.github.io)",
   "license": "ISC",
   "dependencies": {
+    "chalk": "^4.1.0",
     "chrome-debugging-client": "^2.0.0",
     "express": "^4.17.1",
-    "node-color-log": "^5.2.0",
+    "lodash": "^4.17.21",
     "promise.any": "^2.0.1",
+    "random-seed": "^0.3.0",
     "yargs": "^16.2.0"
   }
 }
