@@ -15,7 +15,7 @@ const {enableVerbose} = require("./utils");
 
 function usage() {
   console.log(
-    `Usage: constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout]`
+    `Usage: constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout] [--depfile=<depfile>]`
   )
   process.exit(1)
 }
@@ -36,6 +36,7 @@ async function main() {
       process.exit(1)
     }
   }
+  const depFile = argv.depfile
   if (argv.jobtimeout) {
     try {
       setJobTimeout(parseInt(argv.jobtimeout))
@@ -114,7 +115,7 @@ async function main() {
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, paths, isExcluded, browser)
+      await compile(input, output, `http://localhost:${port}`, paths, isExcluded, browser, depFile)
 
       await chrome.close()
     } catch (e) {

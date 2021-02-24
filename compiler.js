@@ -99,10 +99,11 @@ async function processHtml(httpBase, path, browser, idx) {
       return {
         status: 'abortion',
         path,
+        message,
         idx
       }
     } else if (status === 'timeout') {
-      error(`Timeout reached when processing file: ${path}`)
+      error(align(`Timeout reached when processing file:`), `${path}`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'timeout',
@@ -136,7 +137,8 @@ async function processHtml(httpBase, path, browser, idx) {
   } catch (e) {
     try {
       await browser.send('Target.closeTarget', {targetId})
-    } catch (e) {}
+    } catch (e) {
+    }
     error(`Error during processing file: ${path}`)
     console.trace(e)
     return {
@@ -148,9 +150,11 @@ async function processHtml(httpBase, path, browser, idx) {
 }
 
 const {range} = require('lodash')
-async function compilePaths(paths, httpBase, browser) {
+
+async function compilePaths(paths, httpBase, browser, depFile) {
   const COLORS = range(paths.length).map((i) => randomColor(i))
 
+  const allResults = []
   const results = []
   const taskQueue = {}
   let next = 0
@@ -163,27 +167,42 @@ async function compilePaths(paths, httpBase, browser) {
     if (tasks.length < jobsCount && next < paths.length) {
       taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
       next++
-      clog(COLORS[next-1], align(`Queued file #${next}:`), `${paths[next - 1]}`)
+      clog(COLORS[next - 1], align(`Queued file #${next}:`), `${paths[next - 1]}`)
     } else {
       const result = await any(tasks)
+      allResults.push(result)
       done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {
         clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`), `${result.path}`)
-        delete result.idx
         results.push(result)
       } else {
         clog(COLORS[result.idx], align(`(${done}/${paths.length}) (${result.status}):`), `${result.path}`)
       }
     }
   }
+  try {
+    if (depFile) {
+      await fs.writeFile(depFile, JSON.stringify(
+        {
+          commandLine: process.argv,
+          allResults
+        },
+        null,
+        4
+      ))
+      warn(align(`Wrote depfile:`), depFile)
+    }
+  } catch (e) {
+    error(align(`Encountered error when writing depfile:`), e.message)
+  }
   return results;
 }
 
-async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser) {
+async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, depFile) {
   log(align(`Using job count:`), `${jobsCount}`)
   log(align(`Using job timeout:`), `${jobTimeout}`)
-  const results = await compilePaths(paths, httpBase, browser);
+  const results = await compilePaths(paths, httpBase, browser, depFile);
   const allDepsSet = new Set()
   results.forEach(res => {
     res.deps.forEach(d => allDepsSet.add(d))

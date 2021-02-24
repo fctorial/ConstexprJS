@@ -82,7 +82,7 @@ function warn(...args) {
   logLine(chalk.hex('#ffff00').bold, ...args)
 }
 function error(...args) {
-  logLine(chalk.red().underline, ...args)
+  logLine(chalk.hex('#ff0000').underline, ...args)
 }
 
 function align(s) {
