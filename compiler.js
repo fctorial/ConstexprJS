@@ -19,7 +19,7 @@ async function addDeps(page, deps, logFlag) {
   }
 }
 
-async function processHtml(httpBase, path, browser, idx) {
+async function processHtml(httpBase, browser, generator, output, idx) {
   try {
     const {targetId} = await browser.send('Target.createTarget', {
       url: 'about:blank',
@@ -33,23 +33,25 @@ async function processHtml(httpBase, path, browser, idx) {
     addDeps(page, deps, logFlag)
 
     await page.send('Page.navigate', {
-      url: `${httpBase}${path}`
+      url: `${httpBase}${generator}`
     })
 
     await page.send('Runtime.evaluate', {
       expression: `
     (() => {
       window._ConstexprJS_ = {}
-      window._ConstexprJS_.finishedLoading = false
-      window._ConstexprJS_.signalled = false
-      window._ConstexprJS_.triggerCompilationHook = null
-      window._ConstexprJS_.compilationErrorHook = null
+      window._ConstexprJS_.triggerCompilationHook = () => {}
+      window._ConstexprJS_.compilationErrorHook = () => {}
+      window._ConstexprJS_.addPathsHook = () => {}
       
-      window.addEventListener('load', () => {
-        window._ConstexprJS_.finishedLoading = true
-        window._ConstexprJS_.tryCompilation()
-      })
-      
+      window._ConstexprJS_.tryCompilation = () => {
+        const constexprResources = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
+        document.querySelectorAll('[constexpr]').forEach(
+          el => el.remove()
+        )
+        setTimeout(() => window._ConstexprJS_.triggerCompilation(constexprResources), 1000)
+      }
+
       window._ConstexprJS_.compile = () => {
         window._ConstexprJS_.signalled = true
         window._ConstexprJS_.finishedLoading = document.readyState !== 'loading'
@@ -58,30 +60,43 @@ async function processHtml(httpBase, path, browser, idx) {
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
       }
-      
-      window._ConstexprJS_.tryCompilation = () => {
-        if (!window._ConstexprJS_.finishedLoading || !window._ConstexprJS_.signalled) {
-          return
-        }
-        const constexprResources = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
-        document.querySelectorAll('[constexpr]').forEach(
-          el => el.remove()
-        )
-        setTimeout(() => window._ConstexprJS_.triggerCompilation(constexprResources), 1000)
+      window._ConstexprJS_.addPaths = (path) => {
+        window._ConstexprJS_.addPathsHook(path)
       }
       
       window._ConstexprJS_.triggerCompilation = (constexprResources) => {
-      
         function f() {
           window._ConstexprJS_.triggerCompilationHook(constexprResources)
         }
-      
         setTimeout(f, 100)
       }
     })()
     `,
       awaitPromise: true
     })
+
+    const addedPaths = [];
+    (async () => {
+      const {result: {value: new_paths}} = await page.send('Runtime.evaluate', {
+        expression: `new Promise((resolve) => {
+          window._ConstexprJS_.addPathsHook = (paths) => {
+            if (! Array.isArray(paths)) {
+              throw new Error('addPathsHook should be passed an array')
+            }
+            paths.forEach(p => {
+              if (typeof(p) !== 'object' || typeof(p.generator) !== 'string' || typeof(p.output) !== 'string') {
+                throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
+              }
+            })
+            resolve(paths.map(p => ({generator: p.generator, output: p.output})))
+          }
+        })`,
+        awaitPromise: true,
+        returnByValue: true
+      })
+      addedPaths.push(...new_paths)
+    })()
+      .then()
 
     const {result: {value: {status, message, constexprResources}}} = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve) => {
@@ -93,21 +108,25 @@ async function processHtml(httpBase, path, browser, idx) {
       returnByValue: true
     })
 
+    addedPaths.forEach(p => log(`${generator} added extra path ${p.output} generated using ${p.generator}`))
+
     if (status === 'abort') {
-      warn(align(`Page ${path} signalled an abortion, message:`), `"${message}"`)
+      warn(align(`Page ${generator} signalled an abortion, message:`), `"${message}"`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'abortion',
-        path,
+        path: generator,
+        addedPaths,
         message,
         idx
       }
     } else if (status === 'timeout') {
-      error(align(`Timeout reached when processing file:`), `${path}`)
+      error(align(`Timeout reached when processing file:`), `${generator}`)
       await browser.send('Target.closeTarget', {targetId})
       return {
         status: 'timeout',
-        path,
+        path: generator,
+        addedPaths,
         idx
       }
     }
@@ -125,25 +144,27 @@ async function processHtml(httpBase, path, browser, idx) {
     return {
       status: 'ok',
       idx,
-      path,
+      path: output,
       html,
+      addedPaths,
       constexprResources,
       deps: deps
         .filter(e => !constexprResources.some(ex => ex.endsWith(e)))
         .filter(e => e.startsWith(httpBase))
         .map(e => e.replace(httpBase, ''))
-        .filter(e => !e.endsWith(path))
+        .filter(e => !e.endsWith(generator))
     }
   } catch (e) {
     try {
       await browser.send('Target.closeTarget', {targetId})
     } catch (e) {
     }
-    error(`Error during processing file: ${path}`)
+    error(`Error during processing file: ${generator}`)
     console.trace(e)
     return {
       status: 'error',
-      path,
+      path: generator,
+      addedPaths,
       idx
     }
   }
@@ -151,7 +172,8 @@ async function processHtml(httpBase, path, browser, idx) {
 
 const {range} = require('lodash')
 
-async function compilePaths(paths, httpBase, browser, depFile) {
+async function compilePaths(_paths, httpBase, browser, depFile) {
+  const paths = _paths.map(p => ({generator: p, output: p}))
   const COLORS = range(paths.length).map((i) => randomColor(i))
 
   const allResults = []
@@ -165,12 +187,13 @@ async function compilePaths(paths, httpBase, browser, depFile) {
       break
     }
     if (tasks.length < jobsCount && next < paths.length) {
-      taskQueue[next] = processHtml(httpBase, paths[next], browser, next)
+      taskQueue[next] = processHtml(httpBase, browser, paths[next].generator, paths[next].output, next)
       next++
-      clog(COLORS[next - 1], align(`Queued file #${next}:`), `${paths[next - 1]}`)
+      clog(COLORS[next - 1], align(`Queued file #${next}:`), `${paths[next - 1].output}`)
     } else {
       const result = await any(tasks)
       allResults.push(result)
+      paths.push(...result.addedPaths)
       done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {

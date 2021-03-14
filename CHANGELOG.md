@@ -1,3 +1,7 @@
+# 0.5.0
+
+* Dynamic page generation
+
 # 0.4.1
 
 * Colored log output
