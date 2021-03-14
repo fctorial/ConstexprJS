@@ -44,18 +44,12 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       window._ConstexprJS_.compilationErrorHook = () => {}
       window._ConstexprJS_.addPathsHook = () => {}
       
-      window._ConstexprJS_.tryCompilation = () => {
+      window._ConstexprJS_.compile = () => {
         const constexprResources = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilation(constexprResources), 1000)
-      }
-
-      window._ConstexprJS_.compile = () => {
-        window._ConstexprJS_.signalled = true
-        window._ConstexprJS_.finishedLoading = document.readyState !== 'loading'
-        window._ConstexprJS_.tryCompilation()
+        setTimeout(() => window._ConstexprJS_.triggerCompilation(constexprResources), 100)
       }
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
@@ -77,24 +71,26 @@ async function processHtml(httpBase, browser, generator, output, idx) {
 
     const addedPaths = [];
     (async () => {
-      const {result: {value: new_paths}} = await page.send('Runtime.evaluate', {
-        expression: `new Promise((resolve) => {
-          window._ConstexprJS_.addPathsHook = (paths) => {
-            if (! Array.isArray(paths)) {
-              throw new Error('addPathsHook should be passed an array')
-            }
-            paths.forEach(p => {
-              if (typeof(p) !== 'object' || typeof(p.generator) !== 'string' || typeof(p.output) !== 'string') {
-                throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
+      try {
+        const {result: {value: new_paths}} = await page.send('Runtime.evaluate', {
+          expression: `new Promise((resolve) => {
+            window._ConstexprJS_.addPathsHook = (paths) => {
+              if (! Array.isArray(paths)) {
+                throw new Error('addPathsHook should be passed an array')
               }
-            })
-            resolve(paths.map(p => ({generator: p.generator, output: p.output})))
-          }
-        })`,
-        awaitPromise: true,
-        returnByValue: true
-      })
-      addedPaths.push(...new_paths)
+              paths.forEach(p => {
+                if (typeof(p) !== 'object' || typeof(p.generator) !== 'string' || typeof(p.output) !== 'string') {
+                  throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
+                }
+              })
+              resolve(paths.map(p => ({generator: p.generator, output: p.output})))
+            }
+          })`,
+          awaitPromise: true,
+          returnByValue: true
+        })
+        addedPaths.push(...new_paths)
+      } catch (e) {}
     })()
       .then()
 
@@ -108,7 +104,7 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       returnByValue: true
     })
 
-    addedPaths.forEach(p => log(`${generator} added extra path ${p.output} generated using ${p.generator}`))
+    addedPaths.forEach(p => log(`${generator} added extra path ${p.output} to be generated using ${p.generator}`))
 
     if (status === 'abort') {
       warn(align(`Page ${generator} signalled an abortion, message:`), `"${message}"`)
