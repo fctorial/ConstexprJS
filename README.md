@@ -6,7 +6,7 @@ A static site generator without a DSL
 
 ### Installation
 
-    npm i -g constexpr.js
+    npm i -g constexpr.js@latest
 
 ### Command line options:
 
