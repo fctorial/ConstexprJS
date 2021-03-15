@@ -12,10 +12,8 @@ A static site generator without a DSL
 
     constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout]
 
-### [Guide](https://fctorial.github.io/posts/constexpr.js.html)
+### [Guides](https://fctorial.github.io/tags/constexpr.js.html)
 
 ### Notes:
 
 1. You must have chrome installed for this tool to work.
- 
-2. Files and directories starting with a dot (`.`) are silently ignored.
