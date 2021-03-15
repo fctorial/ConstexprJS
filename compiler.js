@@ -89,8 +89,6 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       returnByValue: true
     })
 
-    addedPaths.forEach(p => log(`${generator} added extra path ${p.output} to be generated using ${p.generator}`))
-
     if (status === 'abort') {
       warn(align(`Page ${generator} signalled an abortion, message:`), `"${message}"`)
       await browser.send('Target.closeTarget', {targetId})
@@ -111,6 +109,8 @@ async function processHtml(httpBase, browser, generator, output, idx) {
         idx
       }
     }
+
+    addedPaths.forEach(p => log(`${generator} added extra path ${p.output} to be generated using ${p.generator}`))
 
     const html = formatHtml(
       (await page.send('DOM.getOuterHTML', {
@@ -175,19 +175,19 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
     } else {
       const result = await any(tasks)
       allResults.push(result)
-      result.addedPaths.forEach(
-        p => {
-          paths.push(p)
-          if (linkMapping[p.generator]) {
-            warn(`Output paths: "${linkMapping[p.generator]}" and "${p.output}" both use the same generator call: "${p.generator}"`)
-          } else{
-            linkMapping[p.generator] = p.output
-          }
-        }
-      )
       done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {
+        result.addedPaths.forEach(
+          p => {
+            paths.push(p)
+            if (linkMapping[p.generator]) {
+              warn(`Output paths: "${linkMapping[p.generator]}" and "${p.output}" both use the same generator call: "${p.generator}"`)
+            } else{
+              linkMapping[p.generator] = p.output
+            }
+          }
+        )
         clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`), `${result.path}`)
         results.push(result)
       } else {
