@@ -1,6 +1,6 @@
 # 0.5.0
 
-* Dynamic page generation
+* Generator pages. ([Guide](https://fctorial.github.io/posts/constexprjs_generator_pages.html))
 
 # 0.4.1
 
