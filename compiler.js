@@ -181,6 +181,7 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
         result.addedPaths.forEach(
           p => {
             paths.push(p)
+            COLORS.push(randomColor(paths.length))
             if (linkMapping[p.generator]) {
               warn(`Output paths: "${linkMapping[p.generator]}" and "${p.output}" both use the same generator call: "${p.generator}"`)
             } else{
