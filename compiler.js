@@ -3,6 +3,7 @@ const {sleep} = require("./utils");
 const any = require('promise.any')
 const fs = require("fs").promises;
 const path = require("path");
+const hp = require('node-html-parser')
 const {fileExists, clog, log, warn, error, align, randomColor} = require("./utils");
 
 let jobsCount = 5
@@ -40,9 +41,9 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       expression: `
     (() => {
       window._ConstexprJS_ = {}
+      window._ConstexprJS_.addedPaths = []
       window._ConstexprJS_.triggerCompilationHook = () => {}
       window._ConstexprJS_.compilationErrorHook = () => {}
-      window._ConstexprJS_.addPathsHook = () => {}
       
       window._ConstexprJS_.compile = () => {
         const constexprResources = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
@@ -54,8 +55,17 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
       }
-      window._ConstexprJS_.addPaths = (path) => {
-        window._ConstexprJS_.addPathsHook(path)
+      window._ConstexprJS_.addPaths = (paths) => {
+        if (! Array.isArray(paths)) {
+          throw new Error('addPaths should be passed an array')
+        }
+        paths.forEach(p => {
+          if (typeof(p) !== 'object' || typeof(p.generator) !== 'string' || typeof(p.output) !== 'string') {
+            throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
+          }
+        })
+
+        window._ConstexprJS_.addedPaths.push(...(paths.map(p => ({generator: p.generator, output: p.output}))))
       }
       
       window._ConstexprJS_.triggerCompilation = (constexprResources) => {
@@ -69,35 +79,10 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       awaitPromise: true
     })
 
-    const addedPaths = [];
-    (async () => {
-      try {
-        const {result: {value: new_paths}} = await page.send('Runtime.evaluate', {
-          expression: `new Promise((resolve) => {
-            window._ConstexprJS_.addPathsHook = (paths) => {
-              if (! Array.isArray(paths)) {
-                throw new Error('addPathsHook should be passed an array')
-              }
-              paths.forEach(p => {
-                if (typeof(p) !== 'object' || typeof(p.generator) !== 'string' || typeof(p.output) !== 'string') {
-                  throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
-                }
-              })
-              resolve(paths.map(p => ({generator: p.generator, output: p.output})))
-            }
-          })`,
-          awaitPromise: true,
-          returnByValue: true
-        })
-        addedPaths.push(...new_paths)
-      } catch (e) {}
-    })()
-      .then()
-
-    const {result: {value: {status, message, constexprResources}}} = await page.send('Runtime.evaluate', {
+    const {result: {value: {status, message, constexprResources, addedPaths}}} = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve) => {
         setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
-        window._ConstexprJS_.triggerCompilationHook = (constexprResources) => resolve({status: 'ok', constexprResources})
+        window._ConstexprJS_.triggerCompilationHook = (constexprResources) => resolve({status: 'ok', constexprResources, addedPaths: window._ConstexprJS_.addedPaths})
         window._ConstexprJS_.compilationErrorHook = (message) => resolve({status: 'abort', message})
       })`,
       awaitPromise: true,
@@ -174,6 +159,7 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
 
   const allResults = []
   const results = []
+  const linkMapping = {}
   const taskQueue = {}
   let next = 0
   let done = 0
@@ -189,7 +175,16 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
     } else {
       const result = await any(tasks)
       allResults.push(result)
-      paths.push(...result.addedPaths)
+      result.addedPaths.forEach(
+        p => {
+          paths.push(p)
+          if (linkMapping[p.generator]) {
+            warn(`Output paths: "${linkMapping[p.generator]}" and "${p.output}" both use the same generator call: "${p.generator}"`)
+          } else{
+            linkMapping[p.generator] = p.output
+          }
+        }
+      )
       done++
       delete taskQueue[result.idx]
       if (result.status === 'ok') {
@@ -215,13 +210,24 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
   } catch (e) {
     error(align(`Encountered error when writing depfile:`), e.message)
   }
-  return results;
+  return {
+    results,
+    linkMapping
+  };
+}
+
+function mapLinks(html, linkMapping) {
+  const root = hp.parse(html)
+  root.querySelectorAll('a')
+    .filter(a => linkMapping[a.getAttribute('href')])
+    .forEach(a => a.setAttribute('href', linkMapping[a.getAttribute('href')]))
+  return root.toString()
 }
 
 async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, depFile) {
   log(align(`Using job count:`), `${jobsCount}`)
   log(align(`Using job timeout:`), `${jobTimeout}`)
-  const results = await compilePaths(paths, httpBase, browser, depFile);
+  const {results, linkMapping} = await compilePaths(paths, httpBase, browser, depFile);
   const allDepsSet = new Set()
   results.forEach(res => {
     res.deps.forEach(d => allDepsSet.add(d))
@@ -239,7 +245,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, 
   }
   const htmls = {}
   for (let i = 0; i < results.length; i++) {
-    htmls[path.join(fsBase, results[i].path)] = results[i].html
+    htmls[path.join(fsBase, results[i].path)] = mapLinks(results[i].html, linkMapping)
   }
 
   for (let p of Object.keys(htmls)) {
