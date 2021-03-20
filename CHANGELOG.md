@@ -1,3 +1,7 @@
+# 0.5.1
+
+* `addExclusions`
+
 # 0.5.0
 
 * Generator pages. ([Guide](https://fctorial.github.io/posts/constexprjs_generator_pages.html))

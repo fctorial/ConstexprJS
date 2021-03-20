@@ -1,6 +1,6 @@
 {
   "name": "constexpr.js",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A static site generator without a DSL",
   "homepage": "https://fctorial.github.io/posts/constexpr.js",
   "repository": "https://github.com/fctorial/ConstexprJS",
