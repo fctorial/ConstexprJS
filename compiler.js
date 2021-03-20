@@ -42,15 +42,16 @@ async function processHtml(httpBase, browser, generator, output, idx) {
     (() => {
       window._ConstexprJS_ = {}
       window._ConstexprJS_.addedPaths = []
+      window._ConstexprJS_.addedExclusions = []
       window._ConstexprJS_.triggerCompilationHook = () => {}
       window._ConstexprJS_.compilationErrorHook = () => {}
       
       window._ConstexprJS_.compile = () => {
-        const constexprResources = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
+        const deducedExclusions = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilation(constexprResources), 100)
+        setTimeout(() => window._ConstexprJS_.triggerCompilation(deducedExclusions), 100)
       }
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
@@ -64,13 +65,15 @@ async function processHtml(httpBase, browser, generator, output, idx) {
             throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
           }
         })
-
         window._ConstexprJS_.addedPaths.push(...(paths.map(p => ({generator: p.generator, output: p.output}))))
       }
+      window._ConstexprJS_.addExclusions = (paths) => {
+        window._ConstexprJS_.addedExclusions.push(...paths)
+      }
       
-      window._ConstexprJS_.triggerCompilation = (constexprResources) => {
+      window._ConstexprJS_.triggerCompilation = (deducedExclusions) => {
         function f() {
-          window._ConstexprJS_.triggerCompilationHook(constexprResources)
+          window._ConstexprJS_.triggerCompilationHook(deducedExclusions)
         }
         setTimeout(f, 100)
       }
@@ -79,10 +82,10 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       awaitPromise: true
     })
 
-    const {result: {value: {status, message, constexprResources, addedPaths}}} = await page.send('Runtime.evaluate', {
+    const {result: {value: {status, message, deducedExclusions, addedExclusions, addedPaths}}} = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve) => {
         setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
-        window._ConstexprJS_.triggerCompilationHook = (constexprResources) => resolve({status: 'ok', constexprResources, addedPaths: window._ConstexprJS_.addedPaths})
+        window._ConstexprJS_.triggerCompilationHook = (deducedExclusions) => resolve({status: 'ok', deducedExclusions, addedExclusions: window._ConstexprJS_.addedExclusions, addedPaths: window._ConstexprJS_.addedPaths})
         window._ConstexprJS_.compilationErrorHook = (message) => resolve({status: 'abort', message})
       })`,
       awaitPromise: true,
@@ -96,6 +99,8 @@ async function processHtml(httpBase, browser, generator, output, idx) {
         status: 'abortion',
         path: generator,
         addedPaths,
+        deducedExclusions,
+        addedExclusions,
         message,
         idx
       }
@@ -106,6 +111,8 @@ async function processHtml(httpBase, browser, generator, output, idx) {
         status: 'timeout',
         path: generator,
         addedPaths,
+        deducedExclusions,
+        addedExclusions,
         idx
       }
     }
@@ -122,13 +129,16 @@ async function processHtml(httpBase, browser, generator, output, idx) {
     )
     logFlag.value = false
     await browser.send('Target.closeTarget', {targetId})
+    const constexprResources = [...deducedExclusions]
+    constexprResources.push(...addedExclusions.map(ex => httpBase + ex))
     return {
       status: 'ok',
       idx,
       path: output,
       html,
       addedPaths,
-      constexprResources,
+      deducedExclusions,
+      addedExclusions,
       deps: deps
         .filter(e => !constexprResources.some(ex => ex.endsWith(e)))
         .filter(e => e.startsWith(httpBase))
@@ -145,7 +155,6 @@ async function processHtml(httpBase, browser, generator, output, idx) {
     return {
       status: 'error',
       path: generator,
-      addedPaths,
       idx
     }
   }
