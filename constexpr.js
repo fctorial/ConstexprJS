@@ -21,23 +21,35 @@ async function main() {
   parser.add_argument('-v', '--version', { action: 'version', version })
   parser.add_argument('--input', {
     required: true,
+    metavar: 'INPUT_DIRECTORY',
     help: 'Input website root directory'
   })
   parser.add_argument('--output', {
     required: true,
+    metavar: 'OUTPUT_DIRECTORY',
     help: 'Output directory, must be empty'
+  })
+  parser.add_argument('--entry', {
+    action: 'append',
+    dest: 'entryPoints',
+    help: 'Add an HTML file to be used as entry point, paths must be relative to the website root, can be used multiple times',
+    default: []
   })
   parser.add_argument('--exclusion', {
     action: 'append',
-    help: `Add a path to exclusions list, HTML files inside it aren\'t processed and resources inside it aren\'t copied, can be used multiple times`
+    dest: 'exclusions',
+    help: `Add a path to exclusions list, HTML files inside it aren\'t processed and resources inside it aren\'t copied, can be used multiple times`,
+    default: []
   })
   parser.add_argument('--jobcount', {
     help: 'Number of compilation jobs to run in parallel',
-    type: 'int'
+    type: 'int',
+    default: 5
   })
   parser.add_argument('--jobtimeout', {
     help: 'Time in milliseconds for which the compiler will wait for the pages to render',
-    type: 'int'
+    type: 'int',
+    default: 999999999
   })
   parser.add_argument('--depfile', {
     help: 'A JSON object containing the command line arguments, file dependency, compilation results will be written to this path'
@@ -65,8 +77,8 @@ async function main() {
   const depFile = argv.depfile
 
   let isExcluded = () => false
-  if (argv.exclusion) {
-    const exclusionPaths = argv.exclusion
+  if (argv.exclusions) {
+    const exclusionPaths = argv.exclusions
     isExcluded = path => {
       for (let ep of exclusionPaths) {
         if (path === ep || isChildOf(path, ep)) {
@@ -105,6 +117,24 @@ async function main() {
     }
   }
 
+  argv.entryPoints.forEach(_p => {
+    const p = input + _p
+    if (!fs.lstatSync(p).isFile()) {
+      error(`ertry point: ${p} is not a regular file`)
+      process.exit(1)
+    }
+    let readable = true
+    try {
+      fs.accessSync(p, fs.constants.R_OK)
+    } catch (e) {
+      readable = false
+    }
+    if (!readable) {
+      error(`ertry point: ${p} is not readable`)
+      process.exit(1)
+    }
+  })
+
   const express = require('express')
   const app = express()
   app.use(express.static(input))
@@ -123,7 +153,12 @@ async function main() {
   }
 
   try {
-    const paths = await htmlFiles(input, input, isExcluded)
+    let paths
+    if (argv.entryPoints && argv.entryPoints.length > 0) {
+      paths = argv.entryPoints
+    } else {
+      paths = await htmlFiles(input, input, isExcluded)
+    }
     const chrome = spawnChrome({
       headless: !argv.noheadless
     });

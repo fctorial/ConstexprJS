@@ -1,5 +1,7 @@
 # 0.6.0
 
+* `--entry` option ([Guide](https://fctorial.github.io/posts/constexprjs_entry_points.html))
+
 * `--jobs` is changed to `--jobcount`
 
 * `--exclusions` is replaced by `--exclusion` (can be used multiple times)
