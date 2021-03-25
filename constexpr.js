@@ -27,7 +27,7 @@ async function main() {
   parser.add_argument('--output', {
     required: true,
     metavar: 'OUTPUT_DIRECTORY',
-    help: 'Output directory, must be empty'
+    help: 'Output directory'
   })
   parser.add_argument('--entry', {
     action: 'append',
@@ -105,11 +105,7 @@ async function main() {
   }
 
   {
-    const outputDirList = fs.readdirSync(output).filter(e => !e.startsWith('.'))
-    if (outputDirList.length !== 0) {
-      error('output directory is not empty')
-      process.exit(1)
-    } else if (
+    if (
       isChildOf(input, output) || isChildOf(output, input)
     ) {
       error('input and output directories must not be inside each other')
@@ -118,7 +114,7 @@ async function main() {
   }
 
   argv.entryPoints.forEach(_p => {
-    const p = input + _p
+    const p = path.join(input, _p)
     if (!fs.lstatSync(p).isFile()) {
       error(`ertry point: ${p} is not a regular file`)
       process.exit(1)
