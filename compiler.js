@@ -4,7 +4,11 @@ const any = require('promise.any')
 const fs = require("fs").promises;
 const path = require("path");
 const hp = require('node-html-parser')
-const {fileExists, clog, log, warn, error, align, randomColor} = require("./utils");
+const {logLine} = require("./utils");
+const {thread} = require("./utils");
+const {fileExists, clog, log, warn, error, align, randomColor} = require("./utils")
+const _ = require('lodash')
+const chalk = require("chalk");
 
 let jobsCount = 5
 let jobTimeout = 999999999
@@ -20,7 +24,7 @@ async function addDeps(page, deps, logFlag) {
   }
 }
 
-async function processHtml(httpBase, browser, generator, output, idx) {
+async function processHtml(httpBase, browser, generator, output, idx, col) {
   try {
     const {targetId} = await browser.send('Target.createTarget', {
       url: 'about:blank',
@@ -43,8 +47,9 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       window._ConstexprJS_ = {}
       window._ConstexprJS_.addedPaths = []
       window._ConstexprJS_.addedExclusions = []
-      window._ConstexprJS_.triggerCompilationHook = () => {}
-      window._ConstexprJS_.compilationErrorHook = () => {}
+      window._ConstexprJS_.triggerCompilationHook = null
+      window._ConstexprJS_.compilationErrorHook = null
+      window._ConstexprJS_.logHook = null
       
       window._ConstexprJS_.compile = () => {
         const deducedExclusions = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
@@ -70,6 +75,20 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       window._ConstexprJS_.addExclusions = (paths) => {
         window._ConstexprJS_.addedExclusions.push(...paths)
       }
+      window._ConstexprJS_.log = (msg) => {
+        return new Promise((resolve) => {
+          function f() {
+            if (window._ConstexprJS_.logHook) {
+              window._ConstexprJS_.logHook(msg)
+              window._ConstexprJS_.logHook = null
+              resolve()
+            } else {
+              setTimeout(f, 100)
+            }
+          }
+          f()
+        })
+      }
       
       window._ConstexprJS_.triggerCompilation = (deducedExclusions) => {
         function f() {
@@ -82,6 +101,19 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       awaitPromise: true
     })
 
+    const logs = []
+    const stopLogging = thread(async () => {
+      const {result: {value: msg}} = await page.send('Runtime.evaluate', {
+        expression: `new Promise((resolve) => {
+          window._ConstexprJS_.logHook = (msg) => resolve(msg)
+        })`,
+        awaitPromise: true,
+        returnByValue: true
+      })
+      logLine(chalk.hex(col), `${generator}: ${msg}`)
+      logs.push(msg)
+    })
+
     const {result: {value: {status, message, deducedExclusions: _deducedExclusions, addedExclusions, addedPaths}}} = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve) => {
         setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
@@ -92,32 +124,35 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       returnByValue: true
     })
 
-    const deducedExclusions = _deducedExclusions.filter(e => e.startsWith(httpBase)).map(e => e.replace(httpBase, ''))
+    const result = {
+      path: generator,
+      logs,
+      idx
+    }
 
+    stopLogging()
     if (status === 'abort') {
       warn(align(`Page ${generator} signalled an abortion, message:`), `"${message}"`)
       await browser.send('Target.closeTarget', {targetId})
-      return {
+      return _.assign(result, {
         status: 'abortion',
-        path: generator,
-        addedPaths,
-        deducedExclusions,
-        addedExclusions,
-        message,
-        idx
-      }
+        message
+      })
     } else if (status === 'timeout') {
       error(align(`Timeout reached when processing file:`), `${generator}`)
       await browser.send('Target.closeTarget', {targetId})
-      return {
-        status: 'timeout',
-        path: generator,
-        addedPaths,
-        deducedExclusions,
-        addedExclusions,
-        idx
-      }
+      return _.assign(result, {
+          status: 'timeout',
+        })
     }
+
+    const deducedExclusions = _deducedExclusions.filter(e => e.startsWith(httpBase)).map(e => e.replace(httpBase, ''))
+
+    _.assign(result, {
+      addedPaths,
+      addedExclusions,
+      deducedExclusions
+    })
 
     addedPaths.forEach(p => log(`${generator} added extra path ${p.output} to be generated using ${p.generator}`))
 
@@ -133,26 +168,23 @@ async function processHtml(httpBase, browser, generator, output, idx) {
     await browser.send('Target.closeTarget', {targetId})
     const constexprResources = [...deducedExclusions]
     constexprResources.push(...addedExclusions)
-    return {
-      status: 'ok',
-      idx,
-      path: output,
-      html,
-      addedPaths,
-      deducedExclusions,
-      addedExclusions,
-      deps: deps
-        .filter(e => !constexprResources.some(ex => httpBase + ex === e))
-        .filter(e => e.startsWith(httpBase))
-        .map(e => e.replace(httpBase, ''))
-        .filter(e => !e.endsWith(generator))
-    }
+    return _.assign(result, {
+        status: 'ok',
+        path: output,
+        html,
+        deps: deps
+          .filter(e => !constexprResources.some(ex => httpBase + ex === e))
+          .filter(e => e.startsWith(httpBase))
+          .map(e => e.replace(httpBase, ''))
+          .filter(e => !e.endsWith(generator))
+      }
+    )
   } catch (e) {
     try {
       await browser.send('Target.closeTarget', {targetId})
     } catch (e) {
     }
-    error(`Error during processing file: ${generator}`)
+    error(`Encountered error when processing file: ${generator}`)
     console.trace(e)
     return {
       status: 'error',
@@ -180,9 +212,10 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
       break
     }
     if (tasks.length < jobsCount && next < paths.length) {
-      taskQueue[next] = processHtml(httpBase, browser, paths[next].generator, paths[next].output, next)
+      const col = COLORS[next]
+      taskQueue[next] = processHtml(httpBase, browser, paths[next].generator, paths[next].output, next, col)
       next++
-      clog(COLORS[next - 1], align(`Queued file #${next}:`), `${paths[next - 1].output}`)
+      clog(col, align(`Queued file #${next}:`), `${paths[next - 1].output}`)
     } else {
       const result = await any(tasks)
       allResults.push(result)
@@ -212,7 +245,7 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
       await fs.writeFile(depFile, JSON.stringify(
         {
           commandLine: process.argv,
-          allResults
+          allResults: allResults.map(res => _.omit(res, 'html'))
         },
         null,
         4

@@ -79,7 +79,7 @@ function log(...args) {
   clog(false, ...args)
 }
 function warn(...args) {
-  logLine(chalk.hex('#ffff00').bold, ...args)
+  clog('#ffff00', ...args)
 }
 function error(...args) {
   logLine(chalk.hex('#ff0000').underline, ...args)
@@ -141,10 +141,25 @@ if (require.main === module) {
   }
 }
 
+function thread(afn) {
+  let ended = false;
+  (async () => {
+    while (!ended) {
+      try {
+        await afn()
+      } catch (e) {}
+    }
+  })()
+  return () => {
+    ended = true
+  }
+}
+
 module.exports = {
   htmlFiles,
   sleep,
   fileExists,
+  logLine,
   clog,
   log,
   warn,
@@ -152,5 +167,6 @@ module.exports = {
   align,
   randomColor,
   enableVerbose,
-  isChildOf
+  isChildOf,
+  thread
 }

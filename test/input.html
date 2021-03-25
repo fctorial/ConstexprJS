@@ -5,31 +5,10 @@
 <ul>
 </ul>
 <script constexpr>
-  for (let i=1; i<=3; i++) {
-    const li = document.createElement('li')
-    const a = document.createElement('a')
-    li.appendChild(a)
-    a.textContent = `page${i}`
-    a.setAttribute('href', `/generator.html?page${i}`)
-    document.querySelector('ul').appendChild(li)
-  }
-  setTimeout(() => {
-      window._ConstexprJS_.addPaths([
-        {
-          generator: "/generator.html?page1",
-          output: "/page1.html"
-        },
-        {
-          generator: "/generator.html?page2",
-          output: "/page2.html"
-        },
-        {
-          generator: "/generator.html?page3",
-          output: "/page3.html"
-        }
-      ])
-      window._ConstexprJS_.compile()
-  }, 100)
+    setTimeout(() => {
+      window._ConstexprJS_.log('hello motherfucker')
+      window._ConstexprJS_.abort('test')
+    }, 100)
 </script>
 </body>
 </html>
