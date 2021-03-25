@@ -1,3 +1,11 @@
+# 0.6.0
+
+* `--jobs` is changed to `--jobcount`
+
+* `--exclusions` is replaced by `--exclusion` (can be used multiple times)
+
+* Better cli help
+
 # 0.5.1
 
 * `addExclusions`

@@ -87,7 +87,7 @@ function error(...args) {
 
 function align(s) {
   if (s.length >= 60) {
-    return s
+    return s + '\n' + '-'.repeat(60)
   } else {
     return s + '-'.repeat(60 - s.length)
   }

@@ -3,8 +3,8 @@
 const {htmlFiles, isPortFree} = require("./utils");
 const {spawnChrome} = require("chrome-debugging-client");
 
-const yargs = require('yargs/yargs')
-const {hideBin} = require('yargs/helpers')
+const { ArgumentParser } = require('argparse')
+const { version } = require('./package.json')
 
 const fs = require('fs')
 const path = require('path')
@@ -13,47 +13,60 @@ const {setJobCount, setJobTimeout, compile} = require("./compiler");
 const {log, error, align} = require("./utils");
 const {enableVerbose} = require("./utils");
 
-function usage() {
-  console.log(
-    `Usage: constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout] [--depfile=<depfile>]`
-  )
-  process.exit(1)
-}
-
 async function main() {
-  const argv = yargs(hideBin(process.argv)).help(false).argv
-  if (argv.help) {
-    usage()
-  }
+  const parser = new ArgumentParser({
+    description: 'Zero cost abstractions for web development'
+  })
+
+  parser.add_argument('-v', '--version', { action: 'version', version })
+  parser.add_argument('--input', {
+    required: true,
+    help: 'Input website root directory'
+  })
+  parser.add_argument('--output', {
+    required: true,
+    help: 'Output directory, must be empty'
+  })
+  parser.add_argument('--exclusion', {
+    action: 'append',
+    help: `Add a path to exclusions list, HTML files inside it aren\'t processed and resources inside it aren\'t copied, can be used multiple times`
+  })
+  parser.add_argument('--jobcount', {
+    help: 'Number of compilation jobs to run in parallel',
+    type: 'int'
+  })
+  parser.add_argument('--jobtimeout', {
+    help: 'Time in milliseconds for which the compiler will wait for the pages to render',
+    type: 'int'
+  })
+  parser.add_argument('--depfile', {
+    help: 'A JSON object containing the command line arguments, file dependency, compilation results will be written to this path'
+  })
+  parser.add_argument('--noheadless', {
+    action: 'store_true',
+    help: 'Do not run chrome in headless mode, can be used for debugging using browser console'
+  })
+  parser.add_argument('--verbose', {
+    action: 'store_true',
+    help: 'Enable verbose logging'
+  })
+
+  const argv = parser.parse_args()
+
   if (argv.verbose) {
     enableVerbose()
   }
-  if (argv.jobs) {
-    try {
-      setJobCount(parseInt(argv.jobs))
-    } catch (e) {
-      console.log(`Invalid job count`)
-      process.exit(1)
-    }
+  if (argv.jobcount) {
+    setJobCount(argv.jobcount)
+  }
+  if (argv.jobtimeout) {
+    setJobTimeout(argv.jobtimeout)
   }
   const depFile = argv.depfile
-  if (argv.jobtimeout) {
-    try {
-      setJobTimeout(parseInt(argv.jobtimeout))
-    } catch (e) {
-      console.log(`Invalid job timeout`)
-      process.exit(1)
-    }
-  }
-  if (
-    !argv.input || !argv.output
-  ) {
-    usage()
-  }
 
   let isExcluded = () => false
-  if (argv.exclusions) {
-    const exclusionPaths = argv.exclusions.split(':')
+  if (argv.exclusion) {
+    const exclusionPaths = argv.exclusion
     isExcluded = path => {
       for (let ep of exclusionPaths) {
         if (path === ep || isChildOf(path, ep)) {
@@ -71,7 +84,8 @@ async function main() {
     !fs.existsSync(input) || !fs.lstatSync(input).isDirectory() ||
     fs.existsSync(output) && !fs.lstatSync(output).isDirectory()
   ) {
-    usage()
+    parser.print_help()
+    process.exit(1)
   }
 
   if (!fs.existsSync(output)) {
@@ -90,6 +104,7 @@ async function main() {
       process.exit(1)
     }
   }
+
   const express = require('express')
   const app = express()
   app.use(express.static(input))
