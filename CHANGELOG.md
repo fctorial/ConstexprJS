@@ -8,6 +8,8 @@
 
 * Better cli help
 
+* Better depfiles
+
 # 0.5.1
 
 * `addExclusions`

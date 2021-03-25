@@ -82,7 +82,7 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       awaitPromise: true
     })
 
-    const {result: {value: {status, message, deducedExclusions, addedExclusions, addedPaths}}} = await page.send('Runtime.evaluate', {
+    const {result: {value: {status, message, deducedExclusions: _deducedExclusions, addedExclusions, addedPaths}}} = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve) => {
         setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
         window._ConstexprJS_.triggerCompilationHook = (deducedExclusions) => resolve({status: 'ok', deducedExclusions, addedExclusions: window._ConstexprJS_.addedExclusions, addedPaths: window._ConstexprJS_.addedPaths})
@@ -91,6 +91,8 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       awaitPromise: true,
       returnByValue: true
     })
+
+    const deducedExclusions = _deducedExclusions.filter(e => e.startsWith(httpBase)).map(e => e.replace(httpBase, ''))
 
     if (status === 'abort') {
       warn(align(`Page ${generator} signalled an abortion, message:`), `"${message}"`)
@@ -130,7 +132,7 @@ async function processHtml(httpBase, browser, generator, output, idx) {
     logFlag.value = false
     await browser.send('Target.closeTarget', {targetId})
     const constexprResources = [...deducedExclusions]
-    constexprResources.push(...addedExclusions.map(ex => httpBase + ex))
+    constexprResources.push(...addedExclusions)
     return {
       status: 'ok',
       idx,
@@ -140,7 +142,7 @@ async function processHtml(httpBase, browser, generator, output, idx) {
       deducedExclusions,
       addedExclusions,
       deps: deps
-        .filter(e => !constexprResources.some(ex => ex.endsWith(e)))
+        .filter(e => !constexprResources.some(ex => httpBase + ex === e))
         .filter(e => e.startsWith(httpBase))
         .map(e => e.replace(httpBase, ''))
         .filter(e => !e.endsWith(generator))
