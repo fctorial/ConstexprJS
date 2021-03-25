@@ -125,7 +125,8 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     })
 
     const result = {
-      path: generator,
+      generator,
+      output,
       logs,
       idx
     }
@@ -170,7 +171,6 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     constexprResources.push(...addedExclusions)
     return _.assign(result, {
         status: 'ok',
-        path: output,
         html,
         deps: deps
           .filter(e => !constexprResources.some(ex => httpBase + ex === e))
@@ -188,7 +188,8 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     console.trace(e)
     return {
       status: 'error',
-      path: generator,
+      generator,
+      output,
       idx
     }
   }
@@ -233,10 +234,10 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
             }
           }
         )
-        clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`), `${result.path}`)
+        clog(COLORS[result.idx], align(`(${done}/${paths.length}) Finished:`), `${result.generator}`)
         results.push(result)
       } else {
-        clog(COLORS[result.idx], align(`(${done}/${paths.length}) (${result.status}):`), `${result.path}`)
+        clog(COLORS[result.idx], align(`(${done}/${paths.length}) (${result.status}):`), `${result.generator}`)
       }
     }
   }
@@ -290,7 +291,7 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, 
   }
   const htmls = {}
   for (let i = 0; i < results.length; i++) {
-    htmls[path.join(fsBase, results[i].path)] = mapLinks(results[i].html, linkMapping)
+    htmls[path.join(fsBase, results[i].output)] = mapLinks(results[i].html, linkMapping)
   }
 
   for (let p of Object.keys(htmls)) {
