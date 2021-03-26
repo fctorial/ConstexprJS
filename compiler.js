@@ -1,4 +1,5 @@
 const formatHtml = s => s
+const urljoin = require('url-join')
 const {sleep} = require("./utils");
 const any = require('promise.any')
 const fs = require("fs").promises;
@@ -38,7 +39,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     addDeps(page, deps, logFlag)
 
     await page.send('Page.navigate', {
-      url: `${httpBase}${generator}`
+      url: urljoin(httpBase, generator)
     })
 
     await page.send('Runtime.evaluate', {
@@ -173,7 +174,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         status: 'ok',
         html,
         deps: deps
-          .filter(e => !constexprResources.some(ex => httpBase + ex === e))
+          .filter(e => !constexprResources.some(ex => urljoin(httpBase, ex) === e))
           .filter(e => e.startsWith(httpBase))
           .map(e => e.replace(httpBase, ''))
           .filter(e => !e.endsWith(generator))
