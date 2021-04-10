@@ -32,7 +32,7 @@ async function main() {
   parser.add_argument('--entry', {
     action: 'append',
     dest: 'entryPoints',
-    help: 'Add an HTML file to be used as entry point, paths must be relative to the website root, can be used multiple times',
+    help: 'Add an HTML file to be used as entry point, paths must be relative to the website root, can be used multiple times, must provide at least one entry point',
     default: []
   })
   parser.add_argument('--exclusion', {
@@ -113,10 +113,14 @@ async function main() {
     }
   }
 
+  if (argv.entryPoints.length === 0) {
+    error('Must provide at least one entry point')
+    process.exit(1)
+  }
   argv.entryPoints.forEach(_p => {
     const p = path.join(input, _p)
     if (!fs.lstatSync(p).isFile()) {
-      error(`ertry point: ${p} is not a regular file`)
+      error(`entry point: ${p} is not a regular file`)
       process.exit(1)
     }
     let readable = true
@@ -126,7 +130,7 @@ async function main() {
       readable = false
     }
     if (!readable) {
-      error(`ertry point: ${p} is not readable`)
+      error(`entry point: ${p} is not readable`)
       process.exit(1)
     }
   })
@@ -149,19 +153,13 @@ async function main() {
   }
 
   try {
-    let paths
-    if (argv.entryPoints && argv.entryPoints.length > 0) {
-      paths = argv.entryPoints
-    } else {
-      paths = await htmlFiles(input, input, isExcluded)
-    }
     const chrome = spawnChrome({
       headless: !argv.noheadless
     });
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, paths, isExcluded, browser, depFile)
+      await compile(input, output, `http://localhost:${port}`, argv.entryPoints, isExcluded, browser, depFile)
 
       await chrome.close()
     } catch (e) {
