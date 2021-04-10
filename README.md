@@ -8,8 +8,4 @@ A static site generator without a DSL
 
     npm i -g constexpr.js@latest
 
-### Command line options:
-
-    constexpr.js --input=<input_directory> --output=<output_directory> [--exclusions=path1:path2] [--verbose] [--jobs=n] [--noheadless] [--jobtimeout]
-
 ### [Guides](https://fctorial.github.io/tags/constexpr.js.html)

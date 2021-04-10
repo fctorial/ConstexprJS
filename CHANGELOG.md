@@ -1,3 +1,13 @@
+# 0.7.0
+
+* Removed automatic HTML discovery
+
+* Added `addDependency` hook ([Guide](https://fctorial.github.io/posts/constexprjs_.html))
+
+* Replaced `addPaths` with `addPath`
+  
+* Replaced `addExclusions` with `addExclusion`
+
 # 0.6.0
 
 * `--entry` option ([Guide](https://fctorial.github.io/posts/constexprjs_entry_points.html))
