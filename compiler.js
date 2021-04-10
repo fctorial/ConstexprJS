@@ -48,6 +48,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       window._ConstexprJS_ = {}
       window._ConstexprJS_.addedPaths = []
       window._ConstexprJS_.addedExclusions = []
+      window._ConstexprJS_.addedDependencies = []
       window._ConstexprJS_.triggerCompilationHook = null
       window._ConstexprJS_.compilationErrorHook = null
       window._ConstexprJS_.logHook = null
@@ -57,24 +58,28 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilation(deducedExclusions), 100)
+        setTimeout(() => window._ConstexprJS_.triggerCompilationHook(deducedExclusions), 100)
       }
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
       }
-      window._ConstexprJS_.addPaths = (paths) => {
-        if (! Array.isArray(paths)) {
-          throw new Error('addPaths should be passed an array')
+      window._ConstexprJS_.addPath = (path) => {
+        if (typeof(path) !== 'object' || typeof(path.generator) !== 'string' || typeof(path.output) !== 'string') {
+          throw new Error('"path" must be objects with keys "generator" and "output" having strings as values')
         }
-        paths.forEach(p => {
-          if (typeof(p) !== 'object' || typeof(p.generator) !== 'string' || typeof(p.output) !== 'string') {
-            throw new Error('Elements in "paths" array must be objects with keys "generator" and "output" having strings as values')
-          }
-        })
-        window._ConstexprJS_.addedPaths.push(...(paths.map(p => ({generator: p.generator, output: p.output}))))
+        window._ConstexprJS_.addedPaths.push({generator: path.generator, output: path.output})
       }
-      window._ConstexprJS_.addExclusions = (paths) => {
-        window._ConstexprJS_.addedExclusions.push(...paths)
+      window._ConstexprJS_.addExclusion = (path) => {
+        if (typeof(path) !== 'string') {
+          throw new Error('"path" must be a string')
+        }
+        window._ConstexprJS_.addedExclusions.push(path)
+      }
+      window._ConstexprJS_.addDependency = (path) => {
+        if (typeof(path) !== 'string') {
+          throw new Error('"path" must be a string')
+        }
+        window._ConstexprJS_.addedDependencies.push(path)
       }
       window._ConstexprJS_.log = (msg) => {
         return new Promise((resolve) => {
@@ -89,13 +94,6 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
           }
           f()
         })
-      }
-      
-      window._ConstexprJS_.triggerCompilation = (deducedExclusions) => {
-        function f() {
-          window._ConstexprJS_.triggerCompilationHook(deducedExclusions)
-        }
-        setTimeout(f, 100)
       }
     })()
     `,
@@ -115,10 +113,21 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       logs.push(msg)
     })
 
-    const {result: {value: {status, message, deducedExclusions: _deducedExclusions, addedExclusions, addedPaths}}} = await page.send('Runtime.evaluate', {
+    const {
+      result: {
+        value: {
+          status,
+          message,
+          deducedExclusions: _deducedExclusions,
+          addedExclusions,
+          addedDependencies,
+          addedPaths
+        }
+      }
+    } = await page.send('Runtime.evaluate', {
       expression: `new Promise((resolve) => {
         setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
-        window._ConstexprJS_.triggerCompilationHook = (deducedExclusions) => resolve({status: 'ok', deducedExclusions, addedExclusions: window._ConstexprJS_.addedExclusions, addedPaths: window._ConstexprJS_.addedPaths})
+        window._ConstexprJS_.triggerCompilationHook = (deducedExclusions) => resolve({status: 'ok', deducedExclusions, addedExclusions: window._ConstexprJS_.addedExclusions, addedDependencies: window._ConstexprJS_.addedDependencies, addedPaths: window._ConstexprJS_.addedPaths})
         window._ConstexprJS_.compilationErrorHook = (message) => resolve({status: 'abort', message})
       })`,
       awaitPromise: true,
@@ -144,8 +153,8 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       error(align(`Timeout reached when processing file:`), `${generator}`)
       await browser.send('Target.closeTarget', {targetId})
       return _.assign(result, {
-          status: 'timeout',
-        })
+        status: 'timeout',
+      })
     }
 
     const deducedExclusions = _deducedExclusions.filter(e => e.startsWith(httpBase)).map(e => e.replace(httpBase, ''))
@@ -153,6 +162,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     _.assign(result, {
       addedPaths,
       addedExclusions,
+      addedDependencies,
       deducedExclusions
     })
 
@@ -170,16 +180,19 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     await browser.send('Target.closeTarget', {targetId})
     const constexprResources = [...deducedExclusions]
     constexprResources.push(...addedExclusions)
+
+    const finalDeps = deps
+      .filter(e => !constexprResources.some(ex => urljoin(httpBase, ex) === e))
+      .filter(e => e.startsWith(httpBase))
+      .map(e => e.replace(httpBase, ''))
+      .filter(e => !e.endsWith(generator))
+    finalDeps.push(...addedDependencies)
+
     return _.assign(result, {
         status: 'ok',
         html,
-        deps: deps
-          .filter(e => !constexprResources.some(ex => urljoin(httpBase, ex) === e))
-          .filter(e => e.startsWith(httpBase))
-          .map(e => e.replace(httpBase, ''))
-          .filter(e => !e.endsWith(generator))
-      }
-    )
+        deps: finalDeps
+    })
   } catch (e) {
     try {
       await browser.send('Target.closeTarget', {targetId})
@@ -230,7 +243,7 @@ async function compilePaths(_paths, httpBase, browser, depFile) {
             COLORS.push(randomColor(paths.length))
             if (linkMapping[p.generator]) {
               warn(`Output paths: "${linkMapping[p.generator]}" and "${p.output}" both use the same generator call: "${p.generator}"`)
-            } else{
+            } else {
               linkMapping[p.generator] = p.output
             }
           }

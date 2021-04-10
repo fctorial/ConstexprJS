@@ -4,11 +4,17 @@
 <body>
 <ul>
 </ul>
+<script src="a.js"></script>
+<script constexpr src="b.js"></script>
+<script src="c.js"></script>
 <script constexpr>
-    setTimeout(() => {
-      window._ConstexprJS_.log('message')
-      window._ConstexprJS_.abort('test')
-    }, 100)
+    async function main() {
+      await fetch("c.js")
+      window._ConstexprJS_.addExclusion("c.js")
+      window._ConstexprJS_.addDependency("c.js")
+    }
+    main()
+        .then(() => window._ConstexprJS_.compile())
 </script>
 </body>
 </html>
