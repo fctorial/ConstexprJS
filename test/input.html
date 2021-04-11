@@ -4,17 +4,16 @@
 <body>
 <ul>
 </ul>
-<script src="a.js"></script>
-<script constexpr src="b.js"></script>
-<script src="c.js"></script>
 <script constexpr>
-    async function main() {
-      await fetch("c.js")
-      window._ConstexprJS_.addExclusion("c.js")
-      window._ConstexprJS_.addDependency("c.js")
-    }
-    // main()
-    //     .then(() => window._ConstexprJS_.compile())
+  async function sleep(n) {
+    return new Promise((r) => setTimeout(() => r(), n))
+  }
+
+  async function main() {
+  }
+
+  main()
+    .then(() => window._ConstexprJS_.compile())
 </script>
 </body>
 </html>

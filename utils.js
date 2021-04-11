@@ -147,7 +147,9 @@ function thread(afn) {
     while (!ended) {
       try {
         await afn()
-      } catch (e) {}
+      } catch (e) {
+        break
+      }
     }
   })()
   return () => {

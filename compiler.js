@@ -26,10 +26,10 @@ async function addDeps(page, deps, logFlag) {
 }
 
 async function processHtml(httpBase, browser, generator, output, idx, col) {
+  const {targetId} = await browser.send('Target.createTarget', {
+    url: 'about:blank',
+  })
   try {
-    const {targetId} = await browser.send('Target.createTarget', {
-      url: 'about:blank',
-    })
     const page = await browser.attachToTarget(targetId)
     await page.send('Page.enable')
     await page.send('Network.enable')
@@ -89,7 +89,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
               window._ConstexprJS_.logHook = null
               resolve()
             } else {
-              setTimeout(f, 100)
+              setTimeout(f, 30)
             }
           }
           f()
@@ -194,18 +194,8 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         deps: finalDeps
     })
   } catch (e) {
-    try {
-      await browser.send('Target.closeTarget', {targetId})
-    } catch (e) {
-    }
-    error(`Encountered error when processing file: ${generator}`)
-    console.trace(e)
-    return {
-      status: 'error',
-      generator,
-      output,
-      idx
-    }
+    error('Unrecoverable error, aborting')
+    process.exit(1)
   }
 }
 

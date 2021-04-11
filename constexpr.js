@@ -142,18 +142,11 @@ async function main() {
     const chrome = spawnChrome({
       headless: !argv.noheadless
     });
-    try {
-      const browser = chrome.connection;
+    const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, argv.entryPoints, browser, depFile, ! argv.skipResources)
+    await compile(input, output, `http://localhost:${port}`, argv.entryPoints, browser, depFile, ! argv.skipResources)
 
-      console.log('await chrome.close()')
-      await chrome.close()
-      console.log('finished')
-    } catch (e) {
-      console.log(e)
-      await chrome.dispose()
-    }
+    await chrome.dispose()
   } catch (e) {
     console.log(e)
   }
