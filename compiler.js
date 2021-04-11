@@ -58,7 +58,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilationHook(deducedExclusions), 100)
+        setTimeout(() => window._ConstexprJS_.triggerCompilationHook(deducedExclusions), 0)
       }
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
@@ -284,7 +284,7 @@ function mapLinks(html, linkMapping) {
   return root.toString()
 }
 
-async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, depFile) {
+async function compile(fsBase, outFsBase, httpBase, paths, browser, depFile, copyResources) {
   log(align(`Using job count:`), `${jobsCount}`)
   log(align(`Using job timeout:`), `${jobTimeout}`)
   const {results, linkMapping} = await compilePaths(paths, httpBase, browser, depFile);
@@ -294,15 +294,8 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, 
     delete res.deps
   })
   const allDeps = [...allDepsSet]
-  const allFilesToCopy = []
-  for (let dep of allDeps) {
-    if (isExcluded(dep)) {
-      warn(align(`Excluding resource:`), `${dep}`)
-    } else {
-      log(align(`Copying resource:`), `${dep}`)
-      allFilesToCopy.push(path.join(fsBase, dep))
-    }
-  }
+  const allFilesToCopy = allDeps.map(dep => path.join(fsBase, dep))
+
   const htmls = {}
   for (let i = 0; i < results.length; i++) {
     htmls[path.join(fsBase, results[i].output)] = mapLinks(results[i].html, linkMapping)
@@ -314,17 +307,20 @@ async function compile(fsBase, outFsBase, httpBase, paths, isExcluded, browser, 
     await fs.mkdir(dir, {recursive: true})
     await fs.writeFile(out, htmls[p])
   }
-  for (let inp of allFilesToCopy) {
-    const out = inp.replace(fsBase, outFsBase)
-    if (await fileExists(out)) {
-      continue
-    }
-    const dir = path.dirname(out)
-    await fs.mkdir(dir, {recursive: true})
-    try {
-      await fs.copyFile(inp, out)
-    } catch (e) {
-      warn(align(`Couldn't copy file:`), `${inp}`)
+  if (copyResources) {
+    for (let inp of allFilesToCopy) {
+      log(align(`Copying resource:`), `${inp}`)
+      const out = inp.replace(fsBase, outFsBase)
+      if (await fileExists(out)) {
+        continue
+      }
+      const dir = path.dirname(out)
+      await fs.mkdir(dir, {recursive: true})
+      try {
+        await fs.copyFile(inp, out)
+      } catch (e) {
+        warn(align(`Couldn't copy file:`), `${inp}`)
+      }
     }
   }
 }

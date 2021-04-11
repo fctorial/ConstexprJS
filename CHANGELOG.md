@@ -8,6 +8,8 @@
   
 * Replaced `addExclusions` with `addExclusion`
 
+* Removed `--exclusion`
+
 # 0.6.0
 
 * `--entry` option ([Guide](https://fctorial.github.io/posts/constexprjs_entry_points.html))

@@ -35,11 +35,10 @@ async function main() {
     help: 'Add an HTML file to be used as entry point, paths must be relative to the website root, can be used multiple times, must provide at least one entry point',
     default: []
   })
-  parser.add_argument('--exclusion', {
-    action: 'append',
-    dest: 'exclusions',
-    help: `Add a path to exclusions list, HTML files inside it aren\'t processed and resources inside it aren\'t copied, can be used multiple times`,
-    default: []
+  parser.add_argument('--skip-resources', {
+    action: 'store_true',
+    dest: 'skipResources',
+    help: 'Do not copy resources to the output directory'
   })
   parser.add_argument('--jobcount', {
     help: 'Number of compilation jobs to run in parallel',
@@ -75,19 +74,6 @@ async function main() {
     setJobTimeout(argv.jobtimeout)
   }
   const depFile = argv.depfile
-
-  let isExcluded = () => false
-  if (argv.exclusions) {
-    const exclusionPaths = argv.exclusions
-    isExcluded = path => {
-      for (let ep of exclusionPaths) {
-        if (path === ep || isChildOf(path, ep)) {
-          return true
-        }
-      }
-      return false
-    }
-  }
 
   const input = path.resolve(argv.input)
   const output = path.resolve(argv.output)
@@ -159,7 +145,7 @@ async function main() {
     try {
       const browser = chrome.connection;
 
-      await compile(input, output, `http://localhost:${port}`, argv.entryPoints, isExcluded, browser, depFile)
+      await compile(input, output, `http://localhost:${port}`, argv.entryPoints, browser, depFile, ! argv.skipResources)
 
       await chrome.close()
     } catch (e) {
