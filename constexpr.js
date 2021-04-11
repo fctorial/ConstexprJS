@@ -147,7 +147,9 @@ async function main() {
 
       await compile(input, output, `http://localhost:${port}`, argv.entryPoints, browser, depFile, ! argv.skipResources)
 
+      console.log('await chrome.close()')
       await chrome.close()
+      console.log('finished')
     } catch (e) {
       console.log(e)
       await chrome.dispose()
