@@ -2,7 +2,7 @@
 
 * Removed automatic HTML discovery
 
-* Added `addDependency` hook ([Guide](https://fctorial.github.io/posts/constexprjs_.html))
+* Added `addDependency` hook ([Guide](https://fctorial.github.io/posts/constexprjs_dependency_resolution.html))
 
 * Replaced `addPaths` with `addPath`
   

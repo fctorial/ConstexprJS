@@ -9,3 +9,5 @@ A static site generator without a DSL
     npm i -g constexpr.js@latest
 
 ### [Guides](https://fctorial.github.io/tags/constexpr.js.html)
+
+### [Changelog](CHANGELOG.md)
