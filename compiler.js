@@ -58,7 +58,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilationHook(deducedExclusions), 0)
+        setTimeout(() => window._ConstexprJS_.triggerCompilationHook(deducedExclusions), 100)
       }
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)

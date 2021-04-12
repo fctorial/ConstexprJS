@@ -1,3 +1,7 @@
+# 0.7.1
+
+* Minor fixes
+
 # 0.7.0
 
 * Removed automatic HTML discovery
