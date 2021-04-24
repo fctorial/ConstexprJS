@@ -91,10 +91,8 @@ async function main() {
   }
 
   {
-    if (
-      isChildOf(input, output) || isChildOf(output, input)
-    ) {
-      error('input and output directories must not be inside each other')
+    if (input === output) {
+      error('"input" and "output" must be different directories')
       process.exit(1)
     }
   }
