@@ -1,3 +1,9 @@
+# 0.7.2
+
+* removed restriction on input/output directories
+
+* logging fix
+
 # 0.7.1
 
 * Minor fixes
@@ -20,7 +26,7 @@
 
 * `log` hook
 
-* `--jobs` is changed to `--jobcount`
+* `--jobs` is changehd to `--jobcount`
 
 * `--exclusions` is replaced by `--exclusion` (can be used multiple times)
 
