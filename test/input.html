@@ -1,5 +1,5 @@
 <html>
-    <script>setTimeout(() => alert(window._ConstexprJS_), 0)</script>
+<!--    <script>setTimeout(() => alert(window._ConstexprJS_), 0)</script>-->
 <head>
 </head>
 <body>
@@ -11,10 +11,14 @@
   }
 
   async function main() {
+    for (let i=0; i<100; i++) {
+      await sleep(0)
+      window._ConstexprJS_.log(i)
+    }
+    window._ConstexprJS_.compile()
   }
 
   main()
-    .then(() => window._ConstexprJS_.compile())
 </script>
 </body>
 </html>

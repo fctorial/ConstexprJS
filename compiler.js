@@ -49,9 +49,9 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       window._ConstexprJS_.addedPaths = []
       window._ConstexprJS_.addedExclusions = []
       window._ConstexprJS_.addedDependencies = []
+      window._ConstexprJS_.loggedStatements = []
       window._ConstexprJS_.triggerCompilationHook = null
       window._ConstexprJS_.compilationErrorHook = null
-      window._ConstexprJS_.logHook = null
       
       window._ConstexprJS_.compile = () => {
         const deducedExclusions = [...document.querySelectorAll('script[constexpr][src]')].map(el => el.src)
@@ -82,18 +82,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         window._ConstexprJS_.addedDependencies.push(path)
       }
       window._ConstexprJS_.log = (msg) => {
-        return new Promise((resolve) => {
-          function f() {
-            if (window._ConstexprJS_.logHook) {
-              window._ConstexprJS_.logHook(msg)
-              window._ConstexprJS_.logHook = null
-              resolve()
-            } else {
-              setTimeout(f, 30)
-            }
-          }
-          f()
-        })
+        return window._ConstexprJS_.loggedStatements.push(msg)
       }
     })()
     `,
@@ -102,15 +91,25 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
 
     const logs = []
     const stopLogging = thread(async () => {
-      const {result: {value: msg}} = await page.send('Runtime.evaluate', {
+      const {result: {value: lines}} = await page.send('Runtime.evaluate', {
         expression: `new Promise((resolve) => {
-          window._ConstexprJS_.logHook = (msg) => resolve(msg)
+          function f() {
+            if (window._ConstexprJS_.loggedStatements.length > 0) {
+              console.log('resolving')
+              resolve(window._ConstexprJS_.loggedStatements)
+              window._ConstexprJS_.loggedStatements = []
+            } else {
+              console.log('waiting')
+              setTimeout(f, 50)
+            }
+          }
+          f()
         })`,
         awaitPromise: true,
         returnByValue: true
       })
-      logLine(chalk.hex(col), `${generator}: ${msg}`)
-      logs.push(msg)
+      lines.forEach((msg) => logLine(chalk.hex(col), `${generator}: ${msg}`))
+      logs.push(...lines)
     })
 
     const {
@@ -189,9 +188,9 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     finalDeps.push(...addedDependencies)
 
     return _.assign(result, {
-        status: 'ok',
-        html,
-        deps: finalDeps
+      status: 'ok',
+      html,
+      deps: finalDeps
     })
   } catch (e) {
     error('Unrecoverable error, aborting')
