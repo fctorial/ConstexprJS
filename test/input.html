@@ -1,24 +1,10 @@
 <html>
-<!--    <script>setTimeout(() => alert(window._ConstexprJS_), 0)</script>-->
+<script constexpr>
+    window._ConstexprJS_.compile()
+</script>
 <head>
 </head>
 <body>
-<ul>
-</ul>
-<script constexpr>
-  async function sleep(n) {
-    return new Promise((r) => setTimeout(() => r(), n))
-  }
-
-  async function main() {
-    for (let i=0; i<100; i++) {
-      await sleep(0)
-      window._ConstexprJS_.log(i)
-    }
-    window._ConstexprJS_.compile()
-  }
-
-  main()
-</script>
+    ok
 </body>
 </html>

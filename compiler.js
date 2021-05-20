@@ -38,13 +38,9 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     const logFlag = {value: true}
     addDeps(page, deps, logFlag)
 
-    await page.send('Page.navigate', {
-      url: urljoin(httpBase, generator)
-    })
-
-    await page.send('Runtime.evaluate', {
+    await page.send('Page.addScriptToEvaluateOnNewDocument', {
       // language=js
-      expression: `
+      source: `
     (() => {
       window._ConstexprJS_ = {}
       window._ConstexprJS_.addedPaths = []
@@ -86,8 +82,11 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         return window._ConstexprJS_.loggedStatements.push(msg)
       }
     })()
-    `,
-      awaitPromise: true
+    `
+    })
+
+    await page.send('Page.navigate', {
+      url: urljoin(httpBase, generator)
     })
 
     const logs = []
@@ -202,6 +201,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       deps: finalDeps
     })
   } catch (e) {
+    console.log(JSON.stringify(e, null, 4))
     error('Unrecoverable error, aborting')
     process.exit(1)
   }
