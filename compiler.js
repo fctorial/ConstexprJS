@@ -43,6 +43,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     })
 
     await page.send('Runtime.evaluate', {
+      // language=js
       expression: `
     (() => {
       window._ConstexprJS_ = {}
@@ -92,6 +93,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
     const logs = []
     const stopLogging = thread(async () => {
       const {result: {value: lines}} = await page.send('Runtime.evaluate', {
+        // language=js
         expression: `new Promise((resolve) => {
           function f() {
             if (window._ConstexprJS_.loggedStatements.length > 0) {
@@ -124,9 +126,16 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         }
       }
     } = await page.send('Runtime.evaluate', {
+      // language=js
       expression: `new Promise((resolve) => {
         setTimeout(() => resolve({status: 'timeout'}), ${jobTimeout})
-        window._ConstexprJS_.triggerCompilationHook = (deducedExclusions) => resolve({status: 'ok', deducedExclusions, addedExclusions: window._ConstexprJS_.addedExclusions, addedDependencies: window._ConstexprJS_.addedDependencies, addedPaths: window._ConstexprJS_.addedPaths})
+        window._ConstexprJS_.triggerCompilationHook = (deducedExclusions) => resolve({
+          status: 'ok',
+          deducedExclusions,
+          addedExclusions: window._ConstexprJS_.addedExclusions,
+          addedDependencies: window._ConstexprJS_.addedDependencies,
+          addedPaths: window._ConstexprJS_.addedPaths
+        })
         window._ConstexprJS_.compilationErrorHook = (message) => resolve({status: 'abort', message})
       })`,
       awaitPromise: true,
