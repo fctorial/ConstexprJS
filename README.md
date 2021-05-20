@@ -1,4 +1,4 @@
-A static site generator without a DSL
+Zero cost abstractions for web development.
 
 ## Demo
 

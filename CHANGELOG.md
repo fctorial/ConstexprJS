@@ -1,3 +1,7 @@
+# 0.7.3
+
+* bugfix
+
 # 0.7.2
 
 * removed restriction on input/output directories
