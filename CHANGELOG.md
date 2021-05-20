@@ -1,3 +1,7 @@
+# 0.7.4
+
+* perf improvement
+
 # 0.7.3
 
 * bugfix

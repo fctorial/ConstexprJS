@@ -55,7 +55,7 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
         document.querySelectorAll('[constexpr]').forEach(
           el => el.remove()
         )
-        setTimeout(() => window._ConstexprJS_.triggerCompilationHook(deducedExclusions), 100)
+        window._ConstexprJS_.triggerCompilationHook(deducedExclusions)
       }
       window._ConstexprJS_.abort = (message) => {
         window._ConstexprJS_.compilationErrorHook(message)
@@ -89,30 +89,6 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       url: urljoin(httpBase, generator)
     })
 
-    const logs = []
-    const stopLogging = thread(async () => {
-      const {result: {value: lines}} = await page.send('Runtime.evaluate', {
-        // language=js
-        expression: `new Promise((resolve) => {
-          function f() {
-            if (window._ConstexprJS_.loggedStatements.length > 0) {
-              console.log('resolving')
-              resolve(window._ConstexprJS_.loggedStatements)
-              window._ConstexprJS_.loggedStatements = []
-            } else {
-              console.log('waiting')
-              setTimeout(f, 50)
-            }
-          }
-          f()
-        })`,
-        awaitPromise: true,
-        returnByValue: true
-      })
-      lines.forEach((msg) => logLine(chalk.hex(col), `${generator}: ${msg}`))
-      logs.push(...lines)
-    })
-
     const {
       result: {
         value: {
@@ -121,7 +97,8 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
           deducedExclusions: _deducedExclusions,
           addedExclusions,
           addedDependencies,
-          addedPaths
+          addedPaths,
+          logs
         }
       }
     } = await page.send('Runtime.evaluate', {
@@ -133,13 +110,16 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
           deducedExclusions,
           addedExclusions: window._ConstexprJS_.addedExclusions,
           addedDependencies: window._ConstexprJS_.addedDependencies,
-          addedPaths: window._ConstexprJS_.addedPaths
+          addedPaths: window._ConstexprJS_.addedPaths,
+          logs: window._ConstexprJS_.loggedStatements
         })
         window._ConstexprJS_.compilationErrorHook = (message) => resolve({status: 'abort', message})
       })`,
       awaitPromise: true,
       returnByValue: true
     })
+
+    logs.forEach((msg) => logLine(chalk.hex(col), `${generator}: ${msg}`))
 
     const result = {
       generator,
@@ -148,7 +128,6 @@ async function processHtml(httpBase, browser, generator, output, idx, col) {
       idx
     }
 
-    stopLogging()
     if (status === 'abort') {
       warn(align(`Page ${generator} signalled an abortion, message:`), `"${message}"`)
       await browser.send('Target.closeTarget', {targetId})
